@@ -19,6 +19,9 @@ if calculator_type == "BEKS":
     with st.form("beks_input_form"):
         st.header("Input Parameters")
 
+        # Add Provider selection field
+        provider = st.selectbox("Provider", ["ESO", "Litgrid"], index=0)
+
         # Create columns for a more compact layout
         col1, col2 = st.columns(2)
 
@@ -60,6 +63,7 @@ if calculator_type == "BEKS":
     if submit_button:
         # Create the request body
         request_body = {
+            "provider": provider,  # Add provider to request body
             "RTE": rte,
             "Q_max": q_max,
             "Q_total": q_total,
@@ -92,7 +96,8 @@ if calculator_type == "BEKS":
         with st.spinner("Processing request..."):
             try:
                 # response = requests.post("http://0.0.0.0:80/beks", json=request_body)
-                response = requests.post("https://epsogapitest.orangebush-c16de4cd.westeurope.azurecontainerapps.io/beks", json=request_body)
+                response = requests.post(
+                    "https://epsogapitest.orangebush-c16de4cd.westeurope.azurecontainerapps.io/beks", json=request_body)
 
                 response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
@@ -330,6 +335,9 @@ elif calculator_type == "P2H":
     with st.form("p2h_input_form"):
         st.header("Input Parameters")
 
+        # Add Provider selection field
+        provider = st.selectbox("Provider", ["ESO", "Litgrid"], index=0)
+
         # Create columns for a more compact layout
         col1, col2 = st.columns(2)
 
@@ -381,6 +389,7 @@ elif calculator_type == "P2H":
     if submit_button:
         # Create the request body
         request_body = {
+            "provider": provider,  # Add provider to request body
             "Q_max_HP": q_max_hp,
             "startup_time_HP": startup_time_hp,
             "delay_HP": delay_hp,
