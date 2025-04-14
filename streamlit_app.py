@@ -97,7 +97,7 @@ if calculator_type == "BEKS":
             try:
                 # response = requests.post("http://0.0.0.0:80/beks", json=request_body)
                 response = requests.post(
-                    "https://epsogapitest.orangebush-c16de4cd.westeurope.azurecontainerapps.io/beks", json=request_body)
+                    "https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/beks", json=request_body)
 
                 response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
@@ -428,7 +428,7 @@ elif calculator_type == "P2H":
             try:
                 # response = requests.post("http://0.0.0.0:80/p2h", json=request_body)
                 response = requests.post(
-                    "https://epsogapitest.orangebush-c16de4cd.westeurope.azurecontainerapps.io/p2h", json=request_body)
+                    "https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/p2h", json=request_body)
 
                 response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
