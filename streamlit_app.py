@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import json
-import pandas as pd
 import plotly.express as px
 
 # Set page title and description
@@ -9,7 +8,7 @@ st.set_page_config(page_title="Energy Optimization", layout="wide")
 st.title("Energy Optimization Tools")
 
 # Create a selector for the calculator type
-calculator_type = st.radio("Select Calculator", ["BEKS", "P2H"], horizontal=True)
+calculator_type = st.radio("Select Calculator", ["BEKS"], horizontal=True)
 
 if calculator_type == "BEKS":
     st.header("BEKS Demo")
@@ -19,13 +18,17 @@ if calculator_type == "BEKS":
     with st.form("beks_input_form"):
         st.header("Input Parameters")
 
-        # Add Provider selection field
-        provider = st.selectbox("Provider", ["ESO", "Litgrid"], index=0)
-
         # Create columns for a more compact layout
         col1, col2 = st.columns(2)
 
         with col1:
+            # Provider with horizontal radio buttons
+            provider = st.radio("Provider", ["ESO", "Litgrid"], index=0, horizontal=True)
+
+            # Sector with horizontal radio buttons
+            sector = st.radio("Sector", ["Paslaugų", "Energetikos", "Pramonės", "Telkėjas", "Kita"], index=0,
+                              horizontal=True)
+
             rte = st.number_input("RTE (%)", min_value=0.0, max_value=100.0, value=88.0, step=1.0)
             q_max = st.number_input("Q_max (MWh)", min_value=0.0, value=1.0, step=0.1)
             q_total = st.number_input("Q_total (MWh)", min_value=0.0, value=2.0, step=0.1)
@@ -34,9 +37,14 @@ if calculator_type == "BEKS":
             n_cycles_da = st.number_input("N_cycles_DA (kartai/d.)", min_value=0, value=1, step=1)
             n_cycles_id = st.number_input("N_cycles_ID (kartai/d.)", min_value=0, value=4, step=1)
 
+            # Reaction time slider with fixed values
+            reaction_time = st.select_slider(
+                "reaction_time (s)",
+                options=[30, 300, 750],
+                value=300  # default value
+            )
+
         with col2:
-            startup_time = st.number_input("startup_time (s)", min_value=0, value=1, step=1)
-            delay = st.number_input("delay (s)", min_value=0, value=0, step=1)
             capex_p = st.number_input("CAPEX_P (tūkst. EUR/MW)", min_value=0.0, value=1000.0, step=10.0)
             capex_c = st.number_input("CAPEX_C (tūkst. Eur/MWh)", min_value=0.0, value=500.0, step=10.0)
             opex_p = st.number_input("OPEX_P (tūkst. Eur/MW/m)", min_value=0.0, value=2.52, step=0.1)
@@ -44,18 +52,33 @@ if calculator_type == "BEKS":
             discount_rate = st.number_input("discount_rate (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.1)
             number_of_years = st.number_input("number_of_years", min_value=1, value=10, step=1)
 
-        # Create a section for produktai
-        st.subheader("Produktai")
-        col3, col4 = st.columns(2)
+        # Fix: Corrected the subheader text and layout
+        st.subheader("Minimali siūloma kaina už balansavimo pajėgumus:")
+        col3, col4, col5, col6, col7 = st.columns(5)
 
         with col3:
-            fcr = st.checkbox("FCR", value=True)
-            afrrd = st.checkbox("aFRRd", value=True)
-            afrru = st.checkbox("aFRRu", value=True)
-
+            p_fcr_cap_bsp = st.number_input("FCR", min_value=0.0, value=0.0, step=1.0, key="fcr_cap")
         with col4:
-            mfrrd = st.checkbox("mFRRd", value=True)
-            mfrru = st.checkbox("mFRRu", value=True)
+            p_affru_cap_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0, key="afrru_cap")
+        with col5:
+            p_affrd_cap_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0, key="afrrd_cap")
+        with col6:
+            p_mffru_cap_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0, key="mfrru_cap")
+        with col7:
+            p_mffrd_cap_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0, key="mfrrd_cap")
+
+        # Fix: Corrected the subheader text and layout
+        st.subheader("Minimali siūloma kaina už balansavimo energiją:")
+        col8, col9, col10, col11 = st.columns(4)
+
+        with col8:
+            p_affru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0, key="afrru_energy")
+        with col9:
+            p_affrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0, key="afrrd_energy")
+        with col10:
+            p_mffru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0, key="mfrru_energy")
+        with col11:
+            p_mffrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0, key="mfrrd_energy")
 
         # Submit button
         submit_button = st.form_submit_button("Submit")
@@ -63,7 +86,7 @@ if calculator_type == "BEKS":
     if submit_button:
         # Create the request body
         request_body = {
-            "provider": provider,  # Add provider to request body
+            "provider": provider,
             "RTE": rte,
             "Q_max": q_max,
             "Q_total": q_total,
@@ -71,21 +94,23 @@ if calculator_type == "BEKS":
             "SOC_max": soc_max,
             "N_cycles_DA": n_cycles_da,
             "N_cycles_ID": n_cycles_id,
-            "startup_time": startup_time,
-            "delay": delay,
+            "reaction_time": reaction_time,
             "CAPEX_P": capex_p,
             "CAPEX_C": capex_c,
             "OPEX_P": opex_p,
             "OPEX_C": opex_c,
             "discount_rate": discount_rate,
             "number_of_years": number_of_years,
-            "produktai": {
-                "FCR": "True" if fcr else "False",
-                "aFRRd": "True" if afrrd else "False",
-                "aFRRu": "True" if afrru else "False",
-                "mFRRd": "True" if mfrrd else "False",
-                "mFRRu": "True" if mfrru else "False"
-            }
+            "P_FCR_CAP_BSP": p_fcr_cap_bsp,
+            "P_aFRRu_CAP_BSP": p_affru_cap_bsp,
+            "P_aFRRd_CAP_BSP": p_affrd_cap_bsp,
+            "P_mFRRu_CAP_BSP": p_mffru_cap_bsp,
+            "P_mFRRd_CAP_BSP": p_mffrd_cap_bsp,
+            "P_aFRRu_BSP": p_affru_bsp,
+            "P_aFRRd_BSP": p_affrd_bsp,
+            "P_mFRRu_BSP": p_mffru_bsp,
+            "P_mFRRd_BSP": p_mffrd_bsp,
+            "Sector": sector
         }
 
         # Display the request body
@@ -96,8 +121,9 @@ if calculator_type == "BEKS":
         with st.spinner("Processing request..."):
             try:
                 # response = requests.post("http://0.0.0.0:80/beks", json=request_body)
-                response = requests.post(
-                    "https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/beks", json=request_body)
+
+                 # Uncomment the line below to use Azure endpoint
+                response = requests.post("https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/beks", json=request_body)
 
                 response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
@@ -115,636 +141,768 @@ if calculator_type == "BEKS":
                     mime="application/json"
                 )
 
-                # Convert raw data to DataFrame for visualization
-                raw_data = pd.DataFrame(data["raw"])
-
-                # Convert datetime column
-                raw_data["dt"] = pd.to_datetime(raw_data["dt"])
-                raw_data = raw_data.sort_values(by="dt")
-                # Visualization section
+                # VISUALIZATION SECTION
                 st.header("Visualization")
 
                 # Create tabs for different visualizations
-                tab1, tab2 = st.tabs(["Optimization", "Economics"])
+                tab1, tab2, tab3 = st.tabs(["Summary", "Market Details", "Economic Results"])
 
                 with tab1:
-                    st.subheader("Optimization Results")
+                    st.subheader("SUMMARY")
 
-                    # Create subtabs for different optimization result categories
-                    opt_tab1, opt_tab2 = st.tabs(["State of Charge", "Buy/Sell Decisions"])
+                    # YEARLY SUMMARY TABLE
+                    st.write("##### YEARLY SUMMARY")
+                    yearly_summary_table = data['aggregated']['summary']['yearly_summary_table']
+                    st.table(yearly_summary_table)
 
-                    with opt_tab1:
-                        soc_cols = [col for col in raw_data.columns if "SOC" in col]
-                        if soc_cols:
-                            fig = px.line(raw_data, x="dt", y=soc_cols,
-                                          labels={"value": "State of Charge", "dt": "Date", "variable": "Metric"},
-                                          title="State of Charge")
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.info("No state of charge data available")
+                    # PROJECT LIFETIME SUMMARY TABLE
+                    st.write("##### PROJECT (LIFETIME) SUMMARY")
+                    project_summary_table = data['aggregated']['summary']['project_summary_table']
+                    st.table(project_summary_table)
 
-                    with opt_tab2:
-                        buy_sell_cols = [col for col in raw_data.columns if "_Q_" in col
-                                         and ("BUY" in col or "SELL" in col)]
-                        if buy_sell_cols:
-                            fig = px.line(raw_data, x="dt", y=buy_sell_cols,
-                                          labels={"value": "Quantity (MWh)", "dt": "Date", "variable": "Metric"},
-                                          title="Buy/Sell Decisions")
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.info("No buy/sell decision data available")
+                    st.write("##### SUPPLEMENTED WITH GRAPHS")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        # NET PRESENT VALUE ANALYSIS CHART
+                        npv_data = data['aggregated']['summary']['npv_chart_data']
+                        fig_npv = px.line(
+                            x=npv_data['years'],
+                            y=npv_data['npv'],
+                            markers=True,
+                            labels={"x": "Year", "y": "NPV (tūkst. EUR)"},
+                            title="NET PRESENT VALUE ANALYSIS"
+                        )
+
+                        # Highlight break-even point if exists
+                        if npv_data['break_even_point'] is not None:
+                            break_even_year = npv_data['years'][npv_data['break_even_point']]
+                            break_even_value = npv_data['npv'][npv_data['break_even_point']]
+
+                            fig_npv.add_scatter(
+                                x=[break_even_year],
+                                y=[break_even_value],
+                                mode="markers",
+                                marker=dict(size=10, color="red"),
+                                name="Break-even Point"
+                            )
+
+                        fig_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        st.plotly_chart(fig_npv, use_container_width=True)
+
+                    with col2:
+                        # REVENUE vs COST BY PRODUCTS CHART
+                        rev_cost_data = data['aggregated']['summary']['revenue_cost_chart_data']
+                        fig_rev_cost = px.bar(
+                            x=rev_cost_data['products'],
+                            y=rev_cost_data['values'],
+                            labels={"x": "Product", "y": "Value (tūkst. EUR)"},
+                            title="REVENUE vs COST BY PRODUCTS"
+                        )
+
+                        fig_rev_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        st.plotly_chart(fig_rev_cost, use_container_width=True)
+
+                    col3, col4 = st.columns(2)
+
+                    with col3:
+                        # UTILISATION (% TIME) BY PRODUCTS CHART
+                        util_data = data['aggregated']['summary']['utilisation_chart_data']
+                        fig_util = px.bar(
+                            x=util_data['products'],
+                            y=util_data['values'],
+                            labels={"x": "Product", "y": "Utilisation (%)"},
+                            title="UTILISATION (% TIME) BY PRODUCTS"
+                        )
+
+                        fig_util.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        st.plotly_chart(fig_util, use_container_width=True)
 
                 with tab2:
-                    st.subheader("Economic Analysis")
+                    st.subheader("MARKET DETAILS")
 
-                    # Display the aggregated data
-                    if "aggregated" in data:
-                        # Create a summary dashboard with aggregated visualizations
-                        st.subheader("Summary Dashboard")
+                    # Add CSS for all market table styles - MADE MORE COMPACT
+                    st.markdown("""
+                    <style>
+                    /* Common table styles - COMPACT VERSION */
+                    .market-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 0px;
+                        font-size: 12px;
+                    }
+                    .market-table td {
+                        padding: 3px;
+                        text-align: center;
+                    }
+                    .market-table th {
+                        padding: 3px;
+                        text-align: center;
+                        font-weight: bold;
+                    }
 
-                        # Create a layout for the dashboard
-                        col1, col2 = st.columns(2)
+                    /* Power market styles */
+                    .power-table td {
+                        background-color: #E0F0F5;
+                    }
+                    .power-header {
+                        font-weight: bold;
+                        background-color: #C5E0E8 !important;
+                    }
+                    .power-direction-header {
+                        background-color: #D5E8EF !important;
+                    }
+                    .power-market-title {
+                        background-color: #3D7890;
+                        color: white;
+                        padding: 5px;
+                        margin: 0;
+                        height: auto;
+                        font-size: 14px;
+                    }
 
-                        # 1. Energy Chart (Energija)
+                    /* Energy market styles */
+                    .energy-table td {
+                        background-color: #E6F5EC;
+                    }
+                    .energy-header {
+                        font-weight: bold;
+                        background-color: #D0EAD9 !important;
+                    }
+                    .energy-direction-header {
+                        background-color: #DCF0E2 !important;
+                    }
+                    .energy-market-title {
+                        background-color: #4D9D6A;
+                        color: white;
+                        padding: 5px;
+                        margin: 0;
+                        height: auto;
+                        font-size: 14px;
+                    }
+
+                    /* Trading market styles */
+                    .trading-table td {
+                        background-color: #EFF5D8;
+                    }
+                    .trading-header {
+                        font-weight: bold;
+                        background-color: #E5ECC5 !important;
+                    }
+                    .trading-direction-header {
+                        background-color: #EAEFCE !important;
+                    }
+                    .trading-market-title {
+                        background-color: #8CB63C;
+                        color: white;
+                        padding: 5px;
+                        margin: 0;
+                        height: auto;
+                        font-size: 14px;
+                    }
+
+                    /* Compact rows */
+                    .row-compact {
+                        margin-bottom: 0px !important;
+                        padding: 0px !important;
+                    }
+
+                    /* Remove margin between hr tags */
+                    hr {
+                        margin: 5px 0 !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+
+                    # Create subtabs for each market
+                    market_tabs = st.tabs([
+                        "BALANSAVIMO PAJĖGUMŲ RINKA",
+                        "BALANSAVIMO ENERGIJOS RINKA",
+                        "ELEKTROS ENERGIJOS PREKYBA"
+                    ])
+
+                    # Tab 1: Power Balancing Market
+                    with market_tabs[0]:
+                        balansavimo_pajegumu_data = data['aggregated']['markets']['BALANSAVIMO_PAJEGUMU_RINKA']
+
+                        # FCR section
+                        fcr_data = balansavimo_pajegumu_data['FCR']
+                        col1, col2 = st.columns([1, 5])
+
                         with col1:
-                            if "total_energy" in data["aggregated"]:
-                                energy_data = data["aggregated"]["total_energy"]
-                                energy_df = pd.DataFrame({
-                                    "Category": list(energy_data.keys()),
-                                    "Value (GWh)": list(energy_data.values())
-                                })
+                            st.markdown(
+                                f"""
+                                <div class="power-market-title">
+                                <h4 style="margin:0;">{fcr_data['header']}</h4>
+                                <small>{fcr_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                                fig = px.bar(energy_df, x="Category", y="Value (GWh)",
-                                             title="Energija (GWh)",
-                                             labels={"Value (GWh)": "GWh", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 2. Power Chart (Galia)
                         with col2:
-                            if "average_power" in data["aggregated"]:
-                                power_data = data["aggregated"]["average_power"]
-                                power_df = pd.DataFrame({
-                                    "Category": list(power_data.keys()),
-                                    "Value (MW)": list(power_data.values())
-                                })
+                            # Create the FCR table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header">{fcr_data['volume_of_procured_reserves']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{fcr_data['volume_of_procured_reserves']['value']} MW</td>
+                                    </tr>
+                                </table>
 
-                                fig = px.bar(power_df, x="Category", y="Value (MW)",
-                                             title="Galia (MW)",
-                                             labels={"Value (MW)": "MW", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header">{fcr_data['utilisation']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{fcr_data['utilisation']['value']} %</td>
+                                    </tr>
+                                </table>
 
-                        # 3. Time Chart (Laikas)
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header">{fcr_data['potential_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{fcr_data['potential_revenue']['value']} EUR</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header">{fcr_data['bids_selected']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{fcr_data['bids_selected']['value']} %</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        # Add separator
+                        st.markdown("<hr>", unsafe_allow_html=True)
+
+                        # aFRR section
+                        afrr_data = balansavimo_pajegumu_data['aFRR']
+                        col1, col2 = st.columns([1, 5])
+
                         with col1:
-                            if "total_time" in data["aggregated"]:
-                                time_data = data["aggregated"]["total_time"]
-                                time_df = pd.DataFrame({
-                                    "Category": list(time_data.keys()),
-                                    "Value (%)": list(time_data.values())
-                                })
+                            st.markdown(
+                                f"""
+                                <div class="power-market-title">
+                                <h4 style="margin:0;">{afrr_data['header']}</h4>
+                                <small>{afrr_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                                fig = px.bar(time_df, x="Category", y="Value (%)",
-                                             title="Laikas (%)",
-                                             labels={"Value (%)": "%", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 4. Revenue/Expenses Chart (Pajamos(+)/išlaidos(-))
                         with col2:
-                            if "total_finance" in data["aggregated"]:
-                                finance_data = data["aggregated"]["total_finance"]
-                                finance_df = pd.DataFrame({
-                                    "Category": list(finance_data.keys()),
-                                    "Value (mln. Eur)": [value / 1000000 for value in finance_data.values()]
-                                    # Convert to millions
-                                })
+                            # Create the aFRR table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{afrr_data['volume_of_procured_reserves']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['volume_of_procured_reserves']['upward']['value']} MW</td>
+                                        <td>{afrr_data['volume_of_procured_reserves']['downward']['value']} MW</td>
+                                    </tr>
+                                </table>
 
-                                fig = px.bar(finance_df, x="Category", y="Value (mln. Eur)",
-                                             title="Pajamos(+)/išlaidos(-) (mln. Eur)",
-                                             labels={"Value (mln. Eur)": "mln. Eur", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{afrr_data['utilisation']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['utilisation']['upward']['value']} %</td>
+                                        <td>{afrr_data['utilisation']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
 
-                        # 5. Total Revenue/Expenses (Suminės pajamos(+)/išlaidos(-))
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{afrr_data['potential_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['potential_revenue']['upward']['value']} EUR</td>
+                                        <td>{afrr_data['potential_revenue']['downward']['value']} EUR</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{afrr_data['bids_selected']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['bids_selected']['upward']['value']} %</td>
+                                        <td>{afrr_data['bids_selected']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        # Add separator
+                        st.markdown("<hr>", unsafe_allow_html=True)
+
+                        # mFRR section
+                        mfrr_data = balansavimo_pajegumu_data['mFRR']
+                        col1, col2 = st.columns([1, 5])
+
                         with col1:
-                            if "comparison" in data["aggregated"] and "BEKS" in data["aggregated"]["comparison"]:
-                                beks_value = data["aggregated"]["comparison"]["BEKS"]
-                                beks_df = pd.DataFrame({
-                                    "Category": ["BEKS"],
-                                    "Value (mln. Eur)": [beks_value / 1000000]  # Convert to millions
-                                })
+                            st.markdown(
+                                f"""
+                                <div class="power-market-title">
+                                <h4 style="margin:0;">{mfrr_data['header']}</h4>
+                                <small>{mfrr_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                                fig = px.bar(beks_df, x="Category", y="Value (mln. Eur)",
-                                             title="Suminės pajamos(+)/išlaidos(-) (mln. Eur)",
-                                             labels={"Value (mln. Eur)": "mln. Eur", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 6. Discounted Payback Chart (Diskontuoto atsipirkimo grafikas)
                         with col2:
-                            if "yearly" in data["aggregated"]:
-                                yearly_data = pd.DataFrame(data["aggregated"]["yearly"])
+                            # Create the mFRR table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{mfrr_data['volume_of_procured_reserves']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['volume_of_procured_reserves']['upward']['value']} MW</td>
+                                        <td>{mfrr_data['volume_of_procured_reserves']['downward']['value']} MW</td>
+                                    </tr>
+                                </table>
 
-                                fig = px.bar(yearly_data, x="YEAR", y="NPV",
-                                             title="Diskontuoto atsipirkimo grafikas",
-                                             labels={"NPV": "mln. Eur", "YEAR": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{mfrr_data['utilisation']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['utilisation']['upward']['value']} %</td>
+                                        <td>{mfrr_data['utilisation']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
 
-                        # Additional detailed data in expanders
-                        st.subheader("Detailed Analysis")
-                        for category, values in data["aggregated"].items():
-                            if category != "yearly":  # Handle yearly data separately
-                                with st.expander(f"{category.replace('_', ' ').title()}"):
-                                    # Convert to DataFrame for better display
-                                    if isinstance(values, dict):
-                                        df = pd.DataFrame(values.items(), columns=["Metric", "Value"])
-                                        st.dataframe(df, use_container_width=True)
-                                    elif isinstance(values, list):
-                                        df = pd.DataFrame(values)
-                                        st.dataframe(df, use_container_width=True)
-                                    else:
-                                        st.write(values)
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{mfrr_data['potential_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['potential_revenue']['upward']['value']} EUR</td>
+                                        <td>{mfrr_data['potential_revenue']['downward']['value']} EUR</td>
+                                    </tr>
+                                </table>
 
-                        # Create a special visualization for yearly data if available
-                        if "yearly" in data["aggregated"]:
-                            yearly_data = pd.DataFrame(data["aggregated"]["yearly"])
+                                <table class="market-table power-table">
+                                    <tr>
+                                        <th class="power-header" colspan="2">{mfrr_data['bids_selected']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="power-direction-header">UPWARD</th>
+                                        <th class="power-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['bids_selected']['upward']['value']} %</td>
+                                        <td>{mfrr_data['bids_selected']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                            with st.expander("Yearly Results", expanded=True):
-                                st.dataframe(yearly_data, use_container_width=True)
+                    # Tab 2: Energy Balancing Market
+                    with market_tabs[1]:
+                        balansavimo_energijos_data = data['aggregated']['markets']['BALANSAVIMO_ENERGIJOS_RINKA']
 
-                                # Plot NPV over years
-                                fig = px.line(yearly_data, x="YEAR", y="NPV", markers=True,
-                                              labels={"NPV": "Net Present Value (EUR)", "YEAR": "Year"},
-                                              title="Net Present Value Over Time")
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
+                        # aFRR section
+                        afrr_data = balansavimo_energijos_data['aFRR']
+                        col1, col2 = st.columns([1, 5])
 
-                                # Plot other yearly metrics
-                                metrics = ["CYCLES", "SOH", "CAPEX", "OPEX", "CF"]
-                                metrics = [m for m in metrics if m in yearly_data.columns]
+                        with col1:
+                            st.markdown(
+                                f"""
+                                <div class="energy-market-title">
+                                <h4 style="margin:0;">{afrr_data['header']}</h4>
+                                <small>{afrr_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
 
-                                if metrics:
-                                    fig = px.line(yearly_data, x="YEAR", y=metrics, markers=True,
-                                                  labels={"value": "Value", "YEAR": "Year", "variable": "Metric"},
-                                                  title="Yearly Metrics")
-                                    # Allow scientific notation on axis but show full number on hover
-                                    fig.update_yaxes(exponentformat="power")
-                                    fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                    st.plotly_chart(fig, use_container_width=True)
+                        with col2:
+                            # Create the aFRR energy table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{afrr_data['volume_of_procured_energy']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['volume_of_procured_energy']['upward']['value']} MWh</td>
+                                        <td>{afrr_data['volume_of_procured_energy']['downward']['value']} MWh</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{afrr_data['utilisation']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['utilisation']['upward']['value']} %</td>
+                                        <td>{afrr_data['utilisation']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{afrr_data['potential_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['potential_revenue']['upward']['value']} EUR</td>
+                                        <td>{afrr_data['potential_revenue']['downward']['value']} EUR</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{afrr_data['bids_selected']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{afrr_data['bids_selected']['upward']['value']} %</td>
+                                        <td>{afrr_data['bids_selected']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        # Add separator
+                        st.markdown("<hr>", unsafe_allow_html=True)
+
+                        # mFRR section
+                        mfrr_data = balansavimo_energijos_data['mFRR']
+                        col1, col2 = st.columns([1, 5])
+
+                        with col1:
+                            st.markdown(
+                                f"""
+                                <div class="energy-market-title">
+                                <h4 style="margin:0;">{mfrr_data['header']}</h4>
+                                <small>{mfrr_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        with col2:
+                            # Create the mFRR energy table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{mfrr_data['volume_of_procured_energy']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['volume_of_procured_energy']['upward']['value']} MWh</td>
+                                        <td>{mfrr_data['volume_of_procured_energy']['downward']['value']} MWh</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{mfrr_data['utilisation']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['utilisation']['upward']['value']} %</td>
+                                        <td>{mfrr_data['utilisation']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{mfrr_data['potential_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['potential_revenue']['upward']['value']} EUR</td>
+                                        <td>{mfrr_data['potential_revenue']['downward']['value']} EUR</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table energy-table">
+                                    <tr>
+                                        <th class="energy-header" colspan="2">{mfrr_data['bids_selected']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="energy-direction-header">UPWARD</th>
+                                        <th class="energy-direction-header">DOWNWARD</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{mfrr_data['bids_selected']['upward']['value']} %</td>
+                                        <td>{mfrr_data['bids_selected']['downward']['value']} %</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                    # Tab 3: Electricity Trading
+                    with market_tabs[2]:
+                        elektros_energijos_data = data['aggregated']['markets']['ELEKTROS_ENERGIJOS_PREKYBA']
+
+                        # Day Ahead section
+                        day_ahead_data = elektros_energijos_data['Day_Ahead']
+                        col1, col2 = st.columns([1, 5])
+
+                        with col1:
+                            st.markdown(
+                                f"""
+                                <div class="trading-market-title">
+                                <h4 style="margin:0;">{day_ahead_data['header']}</h4>
+                                <small>{day_ahead_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        with col2:
+                            # Create the Day Ahead table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{day_ahead_data['volume_of_energy_exchange']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">PURCHASE</th>
+                                        <th class="trading-direction-header">SALE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{day_ahead_data['volume_of_energy_exchange']['purchase']['value']} MWh</td>
+                                        <td>{day_ahead_data['volume_of_energy_exchange']['sale']['value']} MWh</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{day_ahead_data['percentage_of_time']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">PURCHASE</th>
+                                        <th class="trading-direction-header">SALE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{day_ahead_data['percentage_of_time']['purchase']['value']} %</td>
+                                        <td>{day_ahead_data['percentage_of_time']['sale']['value']} %</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{day_ahead_data['potential_cost_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">COST</th>
+                                        <th class="trading-direction-header">REVENUE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{day_ahead_data['potential_cost_revenue']['cost']['value']} EUR</td>
+                                        <td>{day_ahead_data['potential_cost_revenue']['revenue']['value']} EUR</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        # Add separator
+                        st.markdown("<hr>", unsafe_allow_html=True)
+
+                        # Intraday section
+                        intraday_data = elektros_energijos_data['Intraday']
+                        col1, col2 = st.columns([1, 5])
+
+                        with col1:
+                            st.markdown(
+                                f"""
+                                <div class="trading-market-title">
+                                <h4 style="margin:0;">{intraday_data['header']}</h4>
+                                <small>{intraday_data['description']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                        with col2:
+                            # Create the Intraday table layout with ACTUAL VALUES
+                            st.markdown(
+                                f"""
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{intraday_data['volume_of_energy_exchange']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">PURCHASE</th>
+                                        <th class="trading-direction-header">SALE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{intraday_data['volume_of_energy_exchange']['purchase']['value']} MWh</td>
+                                        <td>{intraday_data['volume_of_energy_exchange']['sale']['value']} MWh</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{intraday_data['percentage_of_time']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">PURCHASE</th>
+                                        <th class="trading-direction-header">SALE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{intraday_data['percentage_of_time']['purchase']['value']} %</td>
+                                        <td>{intraday_data['percentage_of_time']['sale']['value']} %</td>
+                                    </tr>
+                                </table>
+
+                                <table class="market-table trading-table">
+                                    <tr>
+                                        <th class="trading-header" colspan="2">{intraday_data['potential_cost_revenue']['header']}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="trading-direction-header">COST</th>
+                                        <th class="trading-direction-header">REVENUE</th>
+                                    </tr>
+                                    <tr>
+                                        <td>{intraday_data['potential_cost_revenue']['cost']['value']} EUR</td>
+                                        <td>{intraday_data['potential_cost_revenue']['revenue']['value']} EUR</td>
+                                    </tr>
+                                </table>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                with tab3:
+                    st.subheader("ECONOMIC RESULTS BY PRODUCT")
+
+                    econ_data = data['aggregated']['economic_results']
+
+                    # Display revenues table and chart
+                    st.write("##### REVENUE BY PRODUCT")
+                    if econ_data['revenue_table']:
+                        st.table(econ_data['revenue_table'])
+
+                        # Create graph from table data
+                        fig_rev = px.bar(
+                            econ_data['revenue_table'],
+                            x="Product",
+                            y="Value (tūkst. EUR)",
+                            title="REVENUE BY PRODUCT"
+                        )
+
+                        fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        st.plotly_chart(fig_rev, use_container_width=True)
                     else:
-                        st.info("No aggregated data available")
-
-                # Add a section to view raw data
-                with st.expander("Raw Data"):
-                    st.dataframe(raw_data, use_container_width=True)
-
-            except requests.exceptions.RequestException as e:
-                st.error(f"Error making request: {str(e)}")
-            except json.JSONDecodeError:
-                st.error("Error parsing response JSON")
-            except Exception as e:
-                st.error(f"An unexpected error occurred: {str(e)}")
-
-elif calculator_type == "P2H":
-    st.header("P2H Demo")
-    st.write("Fill in the form below to submit a request to the P2H API.")
-
-    # Create form for P2H input parameters
-    with st.form("p2h_input_form"):
-        st.header("Input Parameters")
-
-        # Add Provider selection field
-        provider = st.selectbox("Provider", ["ESO", "Litgrid"], index=0)
-
-        # Create columns for a more compact layout
-        col1, col2 = st.columns(2)
-
-        with col1:
-            q_max_hp = st.number_input("Q_max_HP (MW)", min_value=0.0, value=2.0, step=0.1)
-            startup_time_hp = st.number_input("startup_time_HP (s)", min_value=0, value=300, step=10)
-            delay_hp = st.number_input("delay_HP (s)", min_value=0, value=30, step=1)
-            t_hp = st.number_input("T_HP (°C)", value=-10.0, step=0.5)
-            q_max_boiler = st.number_input("Q_max_BOILER (MW)", min_value=0.0, value=3.0, step=0.1)
-            p_fuel = st.number_input("P_FUEL (EUR/nm³)", min_value=0.0, value=0.75, step=0.01)
-            q_fuel = st.number_input("q_FUEL (kWh/nm³)", min_value=0.0, value=9550.0, step=10.0)
-            eta_boiler = st.number_input("eta_BOILER (%)", min_value=0.0, max_value=100.0, value=98.0, step=0.1)
-            d_hs = st.number_input("d_HS (m)", min_value=0.0, value=5.0, step=0.1)
-
-        with col2:
-            h_hs = st.number_input("H_HS (m)", min_value=0.0, value=12.0, step=0.1)
-            t_min_hs = st.number_input("T_min_HS (°C)", min_value=0.0, value=30.0, step=1.0)
-            t_max_hs = st.number_input("T_max_HS (°C)", min_value=0.0, value=85.0, step=1.0)
-            lambda_hs = st.number_input("lambda_HS (W/m·K)", min_value=0.0, value=0.032, step=0.001)
-            dx_hs = st.number_input("dx_HS (m)", min_value=0.0, value=0.25, step=0.01)
-            capex_hp = st.number_input("CAPEX_HP (EUR/kW)", min_value=0.0, value=6000.0, step=100.0)
-            capex_hs = st.number_input("CAPEX_HS (EUR/kWh)", min_value=0.0, value=0.1, step=0.01)
-            opex_hp = st.number_input("OPEX_HP (EUR/kW/year)", min_value=0.0, value=300.0, step=10.0)
-            opex_hs = st.number_input("OPEX_HS (EUR/kWh/year)", min_value=0.0, value=0.005, step=0.001)
-
-        # Row for discount rate and number of years
-        col3, col4 = st.columns(2)
-        with col3:
-            discount_rate = st.number_input("discount_rate (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.1)
-        with col4:
-            number_of_years = st.number_input("number_of_years", min_value=1, value=5, step=1)
-
-        # Create a section for produktai
-        st.subheader("Produktai")
-        col5, col6 = st.columns(2)
-
-        with col5:
-            fcr = st.checkbox("FCR", value=True, key="p2h_fcr")
-            afrrd = st.checkbox("aFRRd", value=True, key="p2h_afrrd")
-            afrru = st.checkbox("aFRRu", value=True, key="p2h_afrru")
-
-        with col6:
-            mfrrd = st.checkbox("mFRRd", value=True, key="p2h_mfrrd")
-            mfrru = st.checkbox("mFRRu", value=True, key="p2h_mfrru")
-
-        # Submit button
-        submit_button = st.form_submit_button("Submit")
-
-    if submit_button:
-        # Create the request body
-        request_body = {
-            "provider": provider,  # Add provider to request body
-            "Q_max_HP": q_max_hp,
-            "startup_time_HP": startup_time_hp,
-            "delay_HP": delay_hp,
-            "T_HP": t_hp,
-            "Q_max_BOILER": q_max_boiler,
-            "P_FUEL": p_fuel,
-            "q_FUEL": q_fuel,
-            "eta_BOILER": eta_boiler,
-            "d_HS": d_hs,
-            "H_HS": h_hs,
-            "T_min_HS": t_min_hs,
-            "T_max_HS": t_max_hs,
-            "lambda_HS": lambda_hs,
-            "dx_HS": dx_hs,
-            "CAPEX_HP": capex_hp,
-            "CAPEX_HS": capex_hs,
-            "OPEX_HP": opex_hp,
-            "OPEX_HS": opex_hs,
-            "discount_rate": discount_rate,
-            "number_of_years": number_of_years,
-            "produktai": {
-                "FCR": "True" if fcr else "False",
-                "aFRRd": "True" if afrrd else "False",
-                "aFRRu": "True" if afrru else "False",
-                "mFRRd": "True" if mfrrd else "False",
-                "mFRRu": "True" if mfrru else "False"
-            }
-        }
-
-        # Display the request body
-        with st.expander("Request Body"):
-            st.json(request_body)
-
-        # Make the POST request
-        with st.spinner("Processing request..."):
-            try:
-                # response = requests.post("http://0.0.0.0:80/p2h", json=request_body)
-                response = requests.post(
-                    "https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/p2h", json=request_body)
-
-                response.raise_for_status()  # Raise exception for 4XX/5XX status codes
-
-                # Parse the response
-                data = response.json()
-
-                # Display success message
-                st.success("Request successful!")
-
-                # Add download button for the JSON response
-                st.download_button(
-                    label="Download JSON",
-                    data=json.dumps(data, indent=2),
-                    file_name="p2h_response.json",
-                    mime="application/json"
-                )
-
-                # Convert raw data to DataFrame for visualization
-                raw_data = pd.DataFrame(data["raw"])
-
-                # Convert datetime column
-                raw_data["dt"] = pd.to_datetime(raw_data["dt"])
-                raw_data = raw_data.sort_values(by="dt")
-
-                # Visualization section
-                st.header("Visualization")
-
-                # Create tabs for different visualizations
-                tab1, tab2 = st.tabs(["Optimization", "Economics"])
-
-                with tab1:
-                    st.subheader("Optimization Results")
-
-                    # Create the two specified graphs
-                    energy_tab, temp_tab = st.tabs(["Energy (MWh)", "Temperature (°C)"])
-
-                    with energy_tab:
-                        # Find energy-related columns
-                        # Lithuanian labels: poreikis, katilinė, perkama DA, perkama ID, parduodama ID
-                        energy_cols = {}
-
-                        # Map the Lithuanian labels to possible column names in the data
-                        if "Q" in raw_data.columns:
-                            energy_cols["poreikis"] = "Q"
-
-                        if "OPT_Q_BOILER_DA" in raw_data.columns:
-                            energy_cols["katilinė"] = "OPT_Q_BOILER_DA"
-
-                        # Buy/sell columns - check which ones exist
-                        buy_da_cols = [c for c in raw_data.columns if "BUY" in c and "DA" in c]
-                        buy_id_cols = [c for c in raw_data.columns if "BUY" in c and "ID" in c]
-                        sell_id_cols = [c for c in raw_data.columns if "SELL" in c and "ID" in c]
-
-                        # Create a dataframe for the MWh chart with columns that exist
-                        energy_df = pd.DataFrame({
-                            "dt": raw_data["dt"]
-                        })
-
-                        # Add each energy column that exists
-                        if "poreikis" in energy_cols:
-                            energy_df["poreikis"] = raw_data[energy_cols["poreikis"]]
-
-                        if "katilinė" in energy_cols:
-                            energy_df["katilinė"] = raw_data[energy_cols["katilinė"]]
-
-                        # For perkama DA (bought day-ahead), sum all relevant columns
-                        if buy_da_cols:
-                            energy_df["perkama DA"] = raw_data[buy_da_cols].sum(axis=1)
-
-                        # For perkama ID (bought intraday), sum all relevant columns
-                        if buy_id_cols:
-                            energy_df["perkama ID"] = raw_data[buy_id_cols].sum(axis=1)
-
-                        # For parduodama ID (sold intraday), sum all relevant columns
-                        if sell_id_cols:
-                            energy_df["parduodama ID"] = raw_data[sell_id_cols].sum(axis=1)
-
-                        # If we have any energy columns, create the chart
-                        if len(energy_df.columns) > 1:  # More than just the dt column
-                            # Melt the dataframe for plotting
-                            energy_melt = pd.melt(
-                                energy_df,
-                                id_vars=["dt"],
-                                var_name="Category",
-                                value_name="MWh"
-                            )
-
-                            # Create a bar chart showing total energy by category
-                            energy_sum = energy_melt.groupby("Category")["MWh"].sum().reset_index()
-
-                            fig = px.bar(
-                                energy_sum,
-                                x="Category",
-                                y="MWh",
-                                title="Energijos paskirstymas (MWh)",
-                                labels={"MWh": "MWh", "Category": "Kategorija"}
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.info("Energijos duomenų nerasta")
-
-                    with temp_tab:
-                        # Find temperature-related columns
-                        temp_cols = {
-                            "Aplinkos temperatūra": None,
-                            "Minimali paduodamo vandens temperatūra": None,
-                            "Planuojama temperatūra talpykloje DA": None,
-                            "Galutinė temperatūra talpykloje": None
-                        }
-
-                        # Map to potential column names
-                        if "Ta" in raw_data.columns:
-                            temp_cols["Aplinkos temperatūra"] = "Ta"
-
-                        if "T1" in raw_data.columns:
-                            temp_cols["Minimali paduodamo vandens temperatūra"] = "T1"
-
-                        if "OPT_T_HS_DA" in raw_data.columns:
-                            temp_cols["Planuojama temperatūra talpykloje DA"] = "OPT_T_HS_DA"
-
-                        if "OPT_T_HS_ID" in raw_data.columns:
-                            temp_cols["Galutinė temperatūra talpykloje"] = "OPT_T_HS_ID"
-
-                        # Create a dataframe for the temperature chart
-                        temp_df = pd.DataFrame({
-                            "dt": raw_data["dt"]
-                        })
-
-                        # Add each temperature column that exists
-                        for label, col in temp_cols.items():
-                            if col and col in raw_data.columns:
-                                temp_df[label] = raw_data[col]
-
-                        # If we have any temperature columns, create the chart
-                        if len(temp_df.columns) > 1:  # More than just the dt column
-                            # Create a line chart for temperatures over time
-                            fig = px.line(
-                                temp_df,
-                                x="dt",
-                                y=[c for c in temp_df.columns if c != "dt"],
-                                title="Temperatūros kitimas",
-                                labels={
-                                    "value": "Temperatūra (°C)",
-                                    "dt": "Data",
-                                    "variable": "Parametras"
-                                }
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.info("Temperatūros duomenų nerasta")
-
-                with tab2:
-                    st.subheader("Economic Analysis")
-
-                    # Display the aggregated data
-                    if "aggregated" in data:
-                        # Create a summary dashboard with aggregated visualizations
-                        st.subheader("Summary Dashboard")
-
-                        # Create a layout for the dashboard
-                        col1, col2 = st.columns(2)
-
-                        # 1. Energy Chart (Energija)
-                        with col1:
-                            if "total_energy" in data["aggregated"]:
-                                energy_data = data["aggregated"]["total_energy"]
-                                energy_df = pd.DataFrame({
-                                    "Category": list(energy_data.keys()),
-                                    "Value (GWh)": list(energy_data.values())
-                                })
-
-                                fig = px.bar(energy_df, x="Category", y="Value (GWh)",
-                                             title="Energija (GWh)",
-                                             labels={"Value (GWh)": "GWh", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 2. Power Chart (Galia)
-                        with col2:
-                            if "average_power" in data["aggregated"]:
-                                power_data = data["aggregated"]["average_power"]
-                                power_df = pd.DataFrame({
-                                    "Category": list(power_data.keys()),
-                                    "Value (MW)": list(power_data.values())
-                                })
-
-                                fig = px.bar(power_df, x="Category", y="Value (MW)",
-                                             title="Galia (MW)",
-                                             labels={"Value (MW)": "MW", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 3. Time Chart (Laikas)
-                        with col1:
-                            if "total_time" in data["aggregated"]:
-                                time_data = data["aggregated"]["total_time"]
-                                time_df = pd.DataFrame({
-                                    "Category": list(time_data.keys()),
-                                    "Value (%)": list(time_data.values())
-                                })
-
-                                fig = px.bar(time_df, x="Category", y="Value (%)",
-                                             title="Laikas (%)",
-                                             labels={"Value (%)": "%", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 4. Revenue/Expenses Chart (Pajamos(+)/išlaidos(-))
-                        with col2:
-                            if "total_finance" in data["aggregated"]:
-                                finance_data = data["aggregated"]["total_finance"]
-                                finance_df = pd.DataFrame({
-                                    "Category": list(finance_data.keys()),
-                                    "Value (mln. Eur)": [value / 1000000 for value in finance_data.values()]
-                                    # Convert to millions
-                                })
-
-                                fig = px.bar(finance_df, x="Category", y="Value (mln. Eur)",
-                                             title="Pajamos(+)/išlaidos(-) (mln. Eur)",
-                                             labels={"Value (mln. Eur)": "mln. Eur", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 5. Comparison Chart
-                        with col1:
-                            if "comparison" in data["aggregated"]:
-                                comparison_data = data["aggregated"]["comparison"]
-                                comparison_df = pd.DataFrame({
-                                    "Category": list(comparison_data.keys()),
-                                    "Value (mln. Eur)": [value / 1000000 for value in comparison_data.values()]
-                                })
-
-                                fig = px.bar(comparison_df, x="Category", y="Value (mln. Eur)",
-                                             title="Suminės pajamos(+)/išlaidos(-) (mln. Eur)",
-                                             labels={"Value (mln. Eur)": "mln. Eur", "Category": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # 6. Discounted Payback Chart (Diskontuoto atsipirkimo grafikas)
-                        with col2:
-                            if "yearly" in data["aggregated"]:
-                                yearly_data = pd.DataFrame(data["aggregated"]["yearly"])
-
-                                fig = px.bar(yearly_data, x="YEAR", y="NPV",
-                                             title="Diskontuoto atsipirkimo grafikas",
-                                             labels={"NPV": "mln. Eur", "YEAR": ""})
-                                fig.update_layout(height=300)
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        # Additional detailed data in expanders
-                        st.subheader("Detailed Analysis")
-                        for category, values in data["aggregated"].items():
-                            if category != "yearly":  # Handle yearly data separately
-                                with st.expander(f"{category.replace('_', ' ').title()}"):
-                                    # Convert to DataFrame for better display
-                                    if isinstance(values, dict):
-                                        df = pd.DataFrame(values.items(), columns=["Metric", "Value"])
-                                        st.dataframe(df, use_container_width=True)
-                                    elif isinstance(values, list):
-                                        df = pd.DataFrame(values)
-                                        st.dataframe(df, use_container_width=True)
-                                    else:
-                                        st.write(values)
-
-                        # Create a special visualization for yearly data if available
-                        if "yearly" in data["aggregated"]:
-                            yearly_data = pd.DataFrame(data["aggregated"]["yearly"])
-
-                            with st.expander("Yearly Results", expanded=True):
-                                st.dataframe(yearly_data, use_container_width=True)
-
-                                # Plot NPV over years
-                                fig = px.line(yearly_data, x="YEAR", y="NPV", markers=True,
-                                              labels={"NPV": "Net Present Value (EUR)", "YEAR": "Year"},
-                                              title="Net Present Value Over Time")
-                                # Allow scientific notation on axis but show full number on hover
-                                fig.update_yaxes(exponentformat="power")
-                                fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                st.plotly_chart(fig, use_container_width=True)
-
-                                # Plot other yearly metrics
-                                metrics = ["CYCLES", "SOH", "CAPEX", "OPEX", "CF"]
-                                metrics = [m for m in metrics if m in yearly_data.columns]
-
-                                if metrics:
-                                    fig = px.line(yearly_data, x="YEAR", y=metrics, markers=True,
-                                                  labels={"value": "Value", "YEAR": "Year", "variable": "Metric"},
-                                                  title="Yearly Metrics")
-                                    # Allow scientific notation on axis but show full number on hover
-                                    fig.update_yaxes(exponentformat="power")
-                                    fig.update_traces(hovertemplate='%{y:,.8f}<extra></extra>')
-                                    st.plotly_chart(fig, use_container_width=True)
+                        st.info("No revenue data available")
+
+                    # Display costs table and chart
+                    st.write("##### COST BY PRODUCT")
+                    if econ_data['cost_table']:
+                        st.table(econ_data['cost_table'])
+
+                        # Create graph from table data
+                        fig_cost = px.bar(
+                            econ_data['cost_table'],
+                            x="Product",
+                            y="Value (tūkst. EUR)",
+                            title="COST BY PRODUCT"
+                        )
+
+                        fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        st.plotly_chart(fig_cost, use_container_width=True)
                     else:
-                        st.info("No aggregated data available")
+                        st.info("No cost data available")
 
-                # Add a section to view raw data
-                with st.expander("Raw Data"):
-                    st.dataframe(raw_data, use_container_width=True)
+                    # Display total profit
+                    st.metric("TOTAL PROFIT", f"{econ_data['total_profit']:.2f} tūkst. EUR")
+
+                    # Display yearly results table
+                    st.write("##### YEARLY RESULTS")
+                    st.table(econ_data['yearly_table'])
+
+                    # Plot yearly NPV
+                    fig_yearly_npv = px.line(
+                        econ_data['yearly_table'],
+                        x="YEAR",
+                        y="NPV (tūkst. EUR)",
+                        markers=True,
+                        title="NET PRESENT VALUE OVER TIME"
+                    )
+
+                    fig_yearly_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                    st.plotly_chart(fig_yearly_npv, use_container_width=True)
 
             except requests.exceptions.RequestException as e:
                 st.error(f"Error making request: {str(e)}")
