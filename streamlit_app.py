@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 import json
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 # Set page title and description
 st.set_page_config(page_title="Energy Optimization", layout="wide")
@@ -38,10 +40,18 @@ if calculator_type == "BEKS":
             n_cycles_id = st.number_input("N_cycles_ID (kartai/d.)", min_value=0, value=4, step=1)
 
             # Reaction time slider with fixed values
+            reaction_time_labels = {
+                30: "<=30s",
+                300: "<=300s",
+                750: "<=750s",
+                1000: ">750s"
+            }
+
             reaction_time = st.select_slider(
                 "reaction_time (s)",
-                options=[30, 300, 750],
-                value=300  # default value
+                options=[30, 300, 750, 1000],
+                value=300,
+                format_func=lambda x: reaction_time_labels[x]
             )
 
         with col2:
@@ -120,10 +130,10 @@ if calculator_type == "BEKS":
         # Make the POST request
         with st.spinner("Processing request..."):
             try:
-                # response = requests.post("http://0.0.0.0:80/beks", json=request_body)
+                response = requests.post("http://0.0.0.0:80/beks", json=request_body)
 
                  # Uncomment the line below to use Azure endpoint
-                response = requests.post("https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/beks", json=request_body)
+                # response = requests.post("https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/beks", json=request_body)
 
                 response.raise_for_status()  # Raise exception for 4XX/5XX status codes
 
@@ -167,15 +177,37 @@ if calculator_type == "BEKS":
                     with col1:
                         # NET PRESENT VALUE ANALYSIS CHART
                         npv_data = data['aggregated']['summary']['npv_chart_data']
-                        fig_npv = px.line(
-                            x=npv_data['years'],
-                            y=npv_data['npv'],
-                            markers=True,
-                            labels={"x": "Year", "y": "NPV (tūkst. EUR)"},
-                            title="NET PRESENT VALUE ANALYSIS"
+
+                        # Create a figure with secondary y-axis
+                        fig_npv = make_subplots(
+                            specs=[[{"secondary_y": True}]]
                         )
 
-                        # Highlight break-even point if exists
+                        # Add bar chart for discounted cash flows
+                        fig_npv.add_trace(
+                            go.Bar(
+                                x=npv_data['years'],
+                                y=npv_data['dcfs'],
+                                name="Discounted Cash Flow",
+                                marker_color="lightblue",
+                                opacity=0.7
+                            ),
+                            secondary_y=False,
+                        )
+
+                        # Add line for cumulative NPV
+                        fig_npv.add_trace(
+                            go.Scatter(
+                                x=npv_data['years'],
+                                y=npv_data['npv'],
+                                mode="lines+markers",
+                                name="Cumulative NPV",
+                                line=dict(color="red", width=3)
+                            ),
+                            secondary_y=True,
+                        )
+
+                        # Highlight break-even point
                         if npv_data['break_even_point'] is not None:
                             break_even_year = npv_data['years'][npv_data['break_even_point']]
                             break_even_value = npv_data['npv'][npv_data['break_even_point']]
@@ -184,11 +216,20 @@ if calculator_type == "BEKS":
                                 x=[break_even_year],
                                 y=[break_even_value],
                                 mode="markers",
-                                marker=dict(size=10, color="red"),
-                                name="Break-even Point"
+                                marker=dict(size=10, color="green"),
+                                name="Break-even Point",
+                                secondary_y=True
                             )
 
-                        fig_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                        # Update layout
+                        fig_npv.update_xaxes(title_text="Year")
+                        fig_npv.update_yaxes(title_text="Discounted Cash Flow (tūkst. EUR)", secondary_y=False)
+                        fig_npv.update_yaxes(title_text="Cumulative NPV (tūkst. EUR)", secondary_y=True)
+                        fig_npv.update_layout(
+                            title="NET PRESENT VALUE ANALYSIS",
+                            hovermode='x unified'
+                        )
+
                         st.plotly_chart(fig_npv, use_container_width=True)
 
                     with col2:
