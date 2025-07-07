@@ -1104,11 +1104,11 @@ elif calculator_type == "P2H":
         if regulation_direction == "Aukštyn":
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = 0
-            produktai = {"FCR": True, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
+            produktai = {"FCR": False, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
         elif regulation_direction == "Žemyn":
             adjusted_reaction_time_u = 0
             adjusted_reaction_time_d = reaction_time_d
-            produktai = {"FCR": True, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
+            produktai = {"FCR": False, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
         else:  # "Į abi puses"
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = reaction_time_d
@@ -1643,11 +1643,11 @@ elif calculator_type == "P2G":
         if regulation_direction == "Aukštyn":
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = 0
-            produktai = {"FCR": True, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
+            produktai = {"FCR": False, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
         elif regulation_direction == "Žemyn":
             adjusted_reaction_time_u = 0
             adjusted_reaction_time_d = reaction_time_d
-            produktai = {"FCR": True, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
+            produktai = {"FCR": False, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
         else:  # "Į abi puses"
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = reaction_time_d
