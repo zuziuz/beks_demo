@@ -1104,11 +1104,11 @@ elif calculator_type == "P2H":
         if regulation_direction == "Aukštyn":
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = 0
-            produktai = {"FCR": True, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
+            produktai = {"FCR": False, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
         elif regulation_direction == "Žemyn":
             adjusted_reaction_time_u = 0
             adjusted_reaction_time_d = reaction_time_d
-            produktai = {"FCR": True, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
+            produktai = {"FCR": False, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
         else:  # "Į abi puses"
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = reaction_time_d
@@ -1544,7 +1544,7 @@ elif calculator_type == "P2G":
         # Electrolyzer technology selection
         electrolyzer_tech = st.radio(
             "Kokia elektrolizerio technologija:",
-            ["SOEC", "ALKALINE", "PEM"],
+            ["SOEC", "AEL", "PEM"],
             horizontal=True,
             key="p2g_electrolyzer_tech"
         )
@@ -1583,15 +1583,6 @@ elif calculator_type == "P2G":
             eta_h2 = st.number_input("Elektrolizerio (elektra -> vandenilis) naudingumo koeficientas (%)",
                                      min_value=0.0, max_value=100.0, value=50.0, step=1.0, key="p2g_eta_h2")
 
-            # Electrolyzer degradation section
-            st.subheader("Elektrolizerio degradacija eta = f(t)")
-            col_deg1, col_deg2 = st.columns(2)
-            with col_deg1:
-                electrolyzer_degradation_percentage = st.number_input("%", min_value=0.0, max_value=100.0, value=15.0,
-                                                                      step=1.0, key="p2g_degradation_percentage")
-            with col_deg2:
-                electrolyzer_degradation_hours = st.number_input("Valandų sk.", min_value=0, value=100000, step=1000,
-                                                                 key="p2g_degradation_hours")
 
             t0 = st.number_input("Pagamintų vandenilio dujų temperatūra (°C)", value=80.0, step=1.0, key="p2g_t0")
             p0 = st.number_input("Pagamintų vandenilio dujų slėgis (bar)", min_value=0.0, value=30.0, step=1.0,
@@ -1643,11 +1634,11 @@ elif calculator_type == "P2G":
         if regulation_direction == "Aukštyn":
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = 0
-            produktai = {"FCR": True, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
+            produktai = {"FCR": False, "aFRRd": False, "aFRRu": True, "mFRRd": False, "mFRRu": True}
         elif regulation_direction == "Žemyn":
             adjusted_reaction_time_u = 0
             adjusted_reaction_time_d = reaction_time_d
-            produktai = {"FCR": True, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
+            produktai = {"FCR": False, "aFRRd": True, "aFRRu": False, "mFRRd": True, "mFRRu": False}
         else:  # "Į abi puses"
             adjusted_reaction_time_u = reaction_time_u
             adjusted_reaction_time_d = reaction_time_d
@@ -1659,8 +1650,6 @@ elif calculator_type == "P2G":
             "P_H2": p_h2,
             "electrolyzer_tech": electrolyzer_tech,
             "eta_H2": eta_h2,
-            "electrolyzer_degradation_hours": electrolyzer_degradation_hours,
-            "electrolyzer_degradation_percentage": electrolyzer_degradation_percentage,
             "reaction_time_d": adjusted_reaction_time_d,
             "reaction_time_u": adjusted_reaction_time_u,
             "T0": t0,
