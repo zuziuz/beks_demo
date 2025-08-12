@@ -1,0 +1,573 @@
+import streamlit as st
+import requests
+import json
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import pandas as pd
+
+
+def render_dsr_calculator(BE_URL):
+    st.header("DSR Demo")
+    st.write("Fill in the form below to submit a request to the DSR API.")
+
+    # Create form for DSR input parameters
+    with st.form("dsr_input_form"):
+        st.header("Input Parameters")
+
+        # Provider and Sector selection
+        col_provider, col_sector = st.columns(2)
+
+        with col_provider:
+            provider = st.radio("Provider", ["ESO", "Litgrid"], index=1, horizontal=True, key="dsr_provider")
+
+        with col_sector:
+            sector = st.radio("Sector", ["Paslaugų", "Energetikos", "Pramonės", "Telkėjas", "Kita"], index=2,
+                              horizontal=True, key="dsr_sector")
+
+        # Add regulation direction selector (same as P2H but without FCR)
+        regulation_direction = st.radio(
+            "Pasirinkite galimą teikti reguliavimo paslaugą:",
+            ["Aukštyn", "Žemyn", "Į abi puses"],
+            horizontal=True,
+            key="dsr_regulation_direction"
+        )
+
+        # Create columns for a more compact layout
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Device characteristics
+            q_avg = st.number_input("Q_avg - Average power (MW)", min_value=0.0, value=10.0, step=0.1,
+                                    key="dsr_q_avg")
+            q_min = st.number_input("Q_min - Minimum power (MW)", min_value=0.0, value=5.0, step=0.1,
+                                    key="dsr_q_min")
+            q_max = st.number_input("Q_max - Maximum power (MW)", min_value=0.0, value=15.0, step=0.1,
+                                    key="dsr_q_max")
+
+            # Reaction time slider with fixed values (same as BEKS)
+            reaction_time_labels = {
+                30: "<=30s",
+                300: "<=300s",
+                750: "<=750s",
+                1000: ">750s"
+            }
+
+            reaction_time = st.select_slider(
+                "reaction_time (s)",
+                options=[30, 300, 750, 1000],
+                value=300,
+                format_func=lambda x: reaction_time_labels[x],
+                key="dsr_reaction_time"
+            )
+
+            t_shift = st.number_input("T_shift - Time shift for restoration (quarters)", min_value=1, value=1, step=1,
+                                      key="dsr_t_shift")
+
+        with col2:
+            # Economic parameters
+            capex = st.number_input("CAPEX (tūkst. EUR/MW)", min_value=0.0, value=150.0, step=10.0,
+                                    key="dsr_capex")
+            opex = st.number_input("OPEX (tūkst. EUR/MW/year)", min_value=0.0, value=10.0, step=1.0,
+                                   key="dsr_opex")
+            discount_rate = st.number_input("discount_rate (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.1,
+                                            key="dsr_discount_rate")
+            number_of_years = st.number_input("number_of_years", min_value=1, value=10, step=1,
+                                              key="dsr_number_of_years")
+
+        # Restoration investment section
+        st.subheader("Device Restoration Investment")
+        restoration_investment_needed = st.checkbox("Include restoration investment in calculation", value=False,
+                                                    key="dsr_restoration_needed")
+        st.info("If checkbox above is checked, the restoration parameters below will be included in the calculation.")
+
+        col3, col4 = st.columns(2)
+        with col3:
+            restoration_investment_percentage = st.number_input("Investment (% of CAPEX)", min_value=0.0,
+                                                                max_value=100.0, value=25.0, step=1.0,
+                                                                key="dsr_restoration_percentage")
+        with col4:
+            restoration_working_hours = st.number_input("Working hours until restoration", min_value=0,
+                                                        value=45000, step=1000,
+                                                        key="dsr_restoration_hours")
+
+        # Optional hourly power profiles section
+        st.subheader("Optional Hourly Power Profiles")
+
+        # Checkbox to include hourly power in request
+        use_hourly_power = st.checkbox("Use hourly power profile (check to include in request)", value=False,
+                                       key="dsr_use_hourly_power")
+
+        st.info(
+            "Enter power consumption for each hour (0-23). If checkbox above is checked, all 24 values will be included in the request.")
+        cols = st.columns(6)
+        hourly_power = {}
+        for h in range(24):
+            col_idx = h % 6
+            with cols[col_idx]:
+                hourly_power[str(h)] = st.number_input(
+                    f"Hour {h}",
+                    min_value=0.0,
+                    value=q_avg,
+                    step=0.1,
+                    key=f"dsr_hourly_power_{h}"
+                )
+
+        # Checkbox to include hourly min/max in request
+        use_hourly_min_max = st.checkbox("Use hourly min/max power profiles (check to include in request)", value=False,
+                                         key="dsr_use_hourly_min_max")
+
+        st.info(
+            "Enter minimum and maximum power for each hour. If checkbox above is checked, all 48 values will be included in the request.")
+
+        # Min power inputs
+        st.write("**Minimum Power (MW) by Hour:**")
+        cols_min = st.columns(6)
+        hourly_min_power = {}
+        for h in range(24):
+            col_idx = h % 6
+            with cols_min[col_idx]:
+                hourly_min_power[str(h)] = st.number_input(
+                    f"Min Hour {h}",
+                    min_value=0.0,
+                    value=q_min,
+                    step=0.1,
+                    key=f"dsr_hourly_min_{h}"
+                )
+
+        # Max power inputs
+        st.write("**Maximum Power (MW) by Hour:**")
+        cols_max = st.columns(6)
+        hourly_max_power = {}
+        for h in range(24):
+            col_idx = h % 6
+            with cols_max[col_idx]:
+                hourly_max_power[str(h)] = st.number_input(
+                    f"Max Hour {h}",
+                    min_value=0.0,
+                    value=q_max,
+                    step=0.1,
+                    key=f"dsr_hourly_max_{h}"
+                )
+
+        # Price threshold sections (no FCR for DSR)
+        st.subheader("Minimali siūloma kaina už balansavimo pajėgumus:")
+        col6, col7, col8, col9 = st.columns(4)
+
+        with col6:
+            p_afrru_cap_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0,
+                                              key="dsr_afrru_cap_thresh")
+        with col7:
+            p_afrrd_cap_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0,
+                                              key="dsr_afrrd_cap_thresh")
+        with col8:
+            p_mfrru_cap_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0,
+                                              key="dsr_mfrru_cap_thresh")
+        with col9:
+            p_mfrrd_cap_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0,
+                                              key="dsr_mfrrd_cap_thresh")
+
+        st.subheader("Minimali siūloma kaina už balansavimo energiją:")
+        col10, col11, col12, col13 = st.columns(4)
+
+        with col10:
+            p_afrru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0,
+                                          key="dsr_afrru_energy_thresh")
+        with col11:
+            p_afrrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0,
+                                          key="dsr_afrrd_energy_thresh")
+        with col12:
+            p_mfrru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0,
+                                          key="dsr_mfrru_energy_thresh")
+        with col13:
+            p_mfrrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0,
+                                          key="dsr_mfrrd_energy_thresh")
+
+        # Submit button
+        submit_button = st.form_submit_button("Submit")
+
+    if submit_button:
+        # Determine produktai based on regulation direction (no FCR for DSR)
+        if regulation_direction == "Aukštyn":
+            produktai = {"aFRRu": True, "aFRRd": False, "mFRRu": True, "mFRRd": False}
+        elif regulation_direction == "Žemyn":
+            produktai = {"aFRRu": False, "aFRRd": True, "mFRRu": False, "mFRRd": True}
+        else:  # "Į abi puses"
+            produktai = {"aFRRu": True, "aFRRd": True, "mFRRu": True, "mFRRd": True}
+
+        # Create the request body
+        request_body = {
+            "Q_avg": q_avg,
+            "Q_min": q_min,
+            "Q_max": q_max,
+            "reaction_time": reaction_time,
+            "T_shift": t_shift,
+            "CAPEX": capex,
+            "OPEX": opex,
+            "discount_rate": discount_rate,
+            "number_of_years": number_of_years,
+            "provider": provider,
+            "Sector": sector,
+            "P_aFRRu_CAP_BSP": p_afrru_cap_bsp,
+            "P_aFRRd_CAP_BSP": p_afrrd_cap_bsp,
+            "P_mFRRu_CAP_BSP": p_mfrru_cap_bsp,
+            "P_mFRRd_CAP_BSP": p_mfrrd_cap_bsp,
+            "P_aFRRu_BSP": p_afrru_bsp,
+            "P_aFRRd_BSP": p_afrrd_bsp,
+            "P_mFRRu_BSP": p_mfrru_bsp,
+            "P_mFRRd_BSP": p_mfrrd_bsp,
+            "produktai": produktai
+        }
+
+        # Only add restoration parameters if checkbox is checked
+        if restoration_investment_needed:
+            request_body["restoration_investment_needed"] = True
+            request_body["restoration_investment_percentage"] = restoration_investment_percentage
+            request_body["restoration_working_hours"] = restoration_working_hours
+        else:
+            request_body["restoration_investment_needed"] = False
+            request_body["restoration_investment_percentage"] = 0.0
+            request_body["restoration_working_hours"] = 0
+
+        # Only add hourly profiles if checkboxes are checked
+        if use_hourly_power:
+            request_body["hourly_power"] = hourly_power
+
+        if use_hourly_min_max:
+            request_body["hourly_min_power"] = hourly_min_power
+            request_body["hourly_max_power"] = hourly_max_power
+
+        with st.expander("Request Body"):
+            st.json(request_body)
+
+        with st.spinner("Processing request..."):
+            try:
+                # response = requests.post(f"{BE_URL}dsr", json=request_body)
+                response = requests.post(f"{BE_URL}dsr", data={"parameters": json.dumps(request_body)})
+
+                if response.status_code == 200:
+                    data = response.json()
+                    st.success("Request successful!")
+
+                    # Display results in tabs (removed Performance tab)
+                    tab1, tab2, tab3, tab4 = st.tabs(
+                        ["Summary", "Markets", "Economic Results", "Comparison"])
+
+                    with tab1:
+                        if 'aggregated' in data and 'summary' in data['aggregated']:
+                            summary = data['aggregated']['summary']
+
+                            # Display yearly and project summary tables
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write("#### YEARLY SUMMARY")
+                                if 'yearly_summary_table' in summary:
+                                    st.table(summary['yearly_summary_table'])
+
+                            with col2:
+                                st.write("#### PROJECT SUMMARY")
+                                if 'project_summary_table' in summary:
+                                    st.table(summary['project_summary_table'])
+
+                            # Display charts
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                # NPV CHART
+                                npv_data = summary.get('npv_chart_data', {})
+                                if npv_data and all(key in npv_data for key in ['years', 'npv', 'dcfs']):
+                                    fig_npv = make_subplots(specs=[[{"secondary_y": True}]])
+
+                                    # Discounted Cash Flows
+                                    fig_npv.add_trace(
+                                        go.Bar(x=npv_data['years'], y=npv_data['dcfs'],
+                                               name='Discounted Cash Flow',
+                                               hovertemplate='%{y:,.2f}<extra></extra>'),
+                                        secondary_y=False
+                                    )
+
+                                    # Cumulative NPV
+                                    fig_npv.add_trace(
+                                        go.Scatter(x=npv_data['years'], y=npv_data['npv'],
+                                                   mode='lines+markers',
+                                                   name='Cumulative NPV',
+                                                   hovertemplate='%{y:,.2f}<extra></extra>'),
+                                        secondary_y=True
+                                    )
+
+                                    # Add break-even point if available
+                                    if npv_data.get('break_even_point') is not None:
+                                        break_even_year = npv_data['years'][npv_data['break_even_point']]
+                                        break_even_value = npv_data['npv'][npv_data['break_even_point']]
+                                        fig_npv.add_scatter(
+                                            x=[break_even_year],
+                                            y=[break_even_value],
+                                            mode="markers",
+                                            marker=dict(size=10, color="green"),
+                                            name="Break-even Point",
+                                            secondary_y=True
+                                        )
+
+                                    fig_npv.update_xaxes(title_text="Year")
+                                    fig_npv.update_yaxes(title_text="Discounted Cash Flow (tūkst. EUR)",
+                                                         secondary_y=False)
+                                    fig_npv.update_yaxes(title_text="Cumulative NPV (tūkst. EUR)",
+                                                         secondary_y=True)
+                                    fig_npv.update_layout(
+                                        title="NET PRESENT VALUE ANALYSIS",
+                                        hovermode='x unified'
+                                    )
+
+                                    st.plotly_chart(fig_npv, use_container_width=True)
+
+                            with col2:
+                                # REVENUE vs COST BY PRODUCTS CHART
+                                rev_cost_data = summary.get('revenue_cost_chart_data', {})
+                                if rev_cost_data and 'products' in rev_cost_data and 'values' in rev_cost_data:
+                                    fig_rev_cost = px.bar(
+                                        x=rev_cost_data['products'],
+                                        y=rev_cost_data['values'],
+                                        labels={"x": "Product", "y": "Value (tūkst. EUR)"},
+                                        title="REVENUE vs COST BY PRODUCTS"
+                                    )
+
+                                    # Color code based on positive/negative values
+                                    colors = ['red' if v < 0 else 'green' for v in rev_cost_data['values']]
+                                    fig_rev_cost.update_traces(marker_color=colors,
+                                                               hovertemplate='%{y:,.2f}<extra></extra>')
+
+                                    st.plotly_chart(fig_rev_cost, use_container_width=True)
+
+                            # Utilization chart
+                            util_data = summary.get('utilisation_chart_data', {})
+                            if util_data and 'products' in util_data and 'values' in util_data:
+                                st.write("#### UTILISATION BY PRODUCT")
+                                fig_util = px.bar(
+                                    x=util_data['products'],
+                                    y=util_data['values'],
+                                    labels={"x": "Product", "y": "Utilisation (%)"},
+                                    title="PRODUCT UTILISATION"
+                                )
+                                fig_util.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                st.plotly_chart(fig_util, use_container_width=True)
+
+                    with tab2:
+                        # Display markets information
+                        if 'aggregated' in data and 'markets' in data['aggregated']:
+                            markets = data['aggregated']['markets']
+
+                            # Balansavimo Pajėgumų Rinka
+                            if 'BALANSAVIMO_PAJEGUMU_RINKA' in markets:
+                                st.write("### BALANSAVIMO PAJĖGUMŲ RINKA")
+                                bpr = markets['BALANSAVIMO_PAJEGUMU_RINKA']
+
+                                # Display only aFRR and mFRR (no FCR for DSR)
+                                for service in ['aFRR', 'mFRR']:
+                                    if service in bpr:
+                                        with st.expander(f"{service} - {bpr[service]['description']}"):
+                                            service_data = bpr[service]
+
+                                            # Volume of procured reserves
+                                            if 'volume_of_procured_reserves' in service_data:
+                                                st.write("**VOLUME OF PROCURED RESERVES**")
+                                                vol_data = service_data['volume_of_procured_reserves']
+                                                if 'upward' in vol_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{vol_data['upward']['value']} {vol_data['upward']['unit']}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{vol_data['downward']['value']} {vol_data['downward']['unit']}")
+
+                                            # Utilisation
+                                            if 'utilisation' in service_data:
+                                                st.write("**UTILISATION (% OF TIME)**")
+                                                util_data = service_data['utilisation']
+                                                if 'upward' in util_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{util_data['upward']['value']} {util_data['upward']['unit']}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{util_data['downward']['value']} {util_data['downward']['unit']}")
+
+                                            # Potential revenue
+                                            if 'potential_revenue' in service_data:
+                                                st.write("**POTENTIAL REVENUE**")
+                                                rev_data = service_data['potential_revenue']
+                                                if 'upward' in rev_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{rev_data['upward']['value']} {rev_data['upward']['unit']}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{rev_data['downward']['value']} {rev_data['downward']['unit']}")
+
+                            # Other markets
+                            for market_key in ['BALANSAVIMO_ENERGIJOS_RINKA', 'INTROS_DIENOS_RINKA']:
+                                if market_key in markets:
+                                    market = markets[market_key]
+                                    st.write(f"### {market_key.replace('_', ' ')}")
+
+                                    if 'summary' in market:
+                                        for key, value in market['summary'].items():
+                                            st.metric(key, f"{value['value']} {value['unit']}")
+
+                    with tab3:
+                        # Display economic results
+                        if 'aggregated' in data and 'economic_results' in data['aggregated']:
+                            econ_data = data['aggregated']['economic_results']
+
+                            # Display revenue table and chart
+                            st.write("##### REVENUE BY PRODUCT")
+                            if 'revenue_table' in econ_data and econ_data['revenue_table']:
+                                st.table(econ_data['revenue_table'])
+
+                                # Create graph from table data
+                                fig_rev = px.bar(
+                                    econ_data['revenue_table'],
+                                    x="Product",
+                                    y="Value (tūkst. EUR)",
+                                    title="REVENUE BY PRODUCT"
+                                )
+                                fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                st.plotly_chart(fig_rev, use_container_width=True)
+
+                            # Display costs table and chart
+                            st.write("##### COST BY PRODUCT")
+                            if 'cost_table' in econ_data and econ_data['cost_table']:
+                                st.table(econ_data['cost_table'])
+
+                                # Create graph from table data
+                                fig_cost = px.bar(
+                                    econ_data['cost_table'],
+                                    x="Product",
+                                    y="Value (tūkst. EUR)",
+                                    title="COST BY PRODUCT"
+                                )
+                                fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                st.plotly_chart(fig_cost, use_container_width=True)
+
+                            # Display total profit
+                            if 'total_profit' in econ_data:
+                                st.metric("TOTAL PROFIT", f"{econ_data['total_profit']:.2f} tūkst. EUR")
+
+                            # Display yearly results table
+                            st.write("##### YEARLY RESULTS")
+                            if 'yearly_table' in econ_data:
+                                st.table(econ_data['yearly_table'])
+
+                                # Plot yearly NPV
+                                yearly_df = pd.DataFrame(econ_data['yearly_table'])
+                                if 'YEAR' in yearly_df.columns and 'NPV (tūkst. EUR)' in yearly_df.columns:
+                                    fig_yearly_npv = px.line(
+                                        yearly_df,
+                                        x="YEAR",
+                                        y="NPV (tūkst. EUR)",
+                                        markers=True,
+                                        title="NET PRESENT VALUE OVER TIME"
+                                    )
+                                    fig_yearly_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                    st.plotly_chart(fig_yearly_npv, use_container_width=True)
+
+                    with tab4:
+                        # DSR-specific comparison section
+                        if 'aggregated' in data and 'comparison' in data['aggregated']:
+                            comparison = data['aggregated']['comparison']
+
+                            st.write("### SAVINGS COMPARISON")
+                            st.write("Comparison between baseline operation and optimized DSR operation")
+
+                            # Check the actual structure of comparison data
+                            if isinstance(comparison, dict):
+                                # Create comparison metrics based on available keys
+                                comparison_items = []
+
+                                # Common keys to look for
+                                baseline_keys = ['baseline', 'be DSR', 'tik katilas', 'without DSR']
+                                optimized_keys = ['optimized', 'su DSR', 'with DSR', 'DSR']
+                                savings_keys = ['DA sutaupoma', 'savings', 'profit', 'sutaupoma']
+
+                                # Find baseline cost
+                                baseline_cost = None
+                                for key in baseline_keys:
+                                    if key in comparison:
+                                        baseline_cost = comparison[key]
+                                        comparison_items.append(("Baseline Cost", baseline_cost,
+                                                                 "Cost of operation without DSR optimization"))
+                                        break
+
+                                # Find optimized cost
+                                optimized_cost = None
+                                for key in optimized_keys:
+                                    if key in comparison:
+                                        optimized_cost = comparison[key]
+                                        comparison_items.append(("Optimized Cost", optimized_cost,
+                                                                 "Cost of operation with DSR optimization"))
+                                        break
+
+                                # Find savings
+                                savings = None
+                                for key in savings_keys:
+                                    if key in comparison:
+                                        savings = comparison[key]
+                                        comparison_items.append(
+                                            ("Savings", savings, "Savings from optimized scheduling"))
+                                        break
+
+                                # Display all other items in comparison
+                                for key, value in comparison.items():
+                                    if key not in baseline_keys + optimized_keys + savings_keys:
+                                        comparison_items.append((key.replace('_', ' ').title(), value, f"{key} value"))
+
+                                # Display metrics
+                                if comparison_items:
+                                    cols = st.columns(min(len(comparison_items), 3))
+                                    for idx, (label, value, help_text) in enumerate(comparison_items[:3]):
+                                        col_idx = idx % 3
+                                        with cols[col_idx]:
+                                            if "savings" in label.lower() or "sutaupoma" in label.lower():
+                                                st.metric(label,
+                                                          f"{abs(value):.2f} tūkst. EUR",
+                                                          delta=f"{abs(value):.2f}",
+                                                          delta_color="normal" if value >= 0 else "inverse",
+                                                          help=help_text)
+                                            else:
+                                                st.metric(label,
+                                                          f"{value:.2f} tūkst. EUR",
+                                                          help=help_text)
+
+                                    # If more than 3 items, display the rest
+                                    if len(comparison_items) > 3:
+                                        st.write("#### Additional Comparison Data")
+                                        for label, value, help_text in comparison_items[3:]:
+                                            st.metric(label, f"{value:.2f}", help=help_text)
+
+                                # If we can calculate savings from baseline and optimized
+                                if baseline_cost is not None and optimized_cost is not None and savings is None:
+                                    calculated_savings = baseline_cost - optimized_cost
+                                    st.metric("Calculated Savings",
+                                              f"{abs(calculated_savings):.2f} tūkst. EUR",
+                                              delta=f"{abs(calculated_savings):.2f}",
+                                              delta_color="normal" if calculated_savings >= 0 else "inverse",
+                                              help="Calculated from baseline minus optimized costs")
+
+                                # Display raw comparison data in expander for debugging
+                                with st.expander("Raw Comparison Data"):
+                                    st.json(comparison)
+                            else:
+                                st.info("Comparison data structure is not as expected.")
+                                st.write(f"Received type: {type(comparison)}")
+                                st.write(f"Data: {comparison}")
+                        else:
+                            st.info("No comparison data available in the response.")
+
+                else:
+                    st.error(f"Request failed with status code: {response.status_code}")
+                    st.text(response.text)
+
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
