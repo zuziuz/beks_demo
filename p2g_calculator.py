@@ -110,13 +110,13 @@ def render_p2g_calculator(BE_URL):
         col8, col9, col10, col11 = st.columns(4)
 
         with col8:
-            p_afrru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0, key="p2g_afrru_energy")
+            p_afrru_bsp = st.number_input("aFRRu", value=0.0, step=1.0, key="p2g_afrru_energy")
         with col9:
-            p_afrrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0, key="p2g_afrrd_energy")
+            p_afrrd_bsp = st.number_input("aFRRd", value=0.0, step=1.0, key="p2g_afrrd_energy")
         with col10:
-            p_mfrru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0, key="p2g_mfrru_energy")
+            p_mfrru_bsp = st.number_input("mFRRu", value=0.0, step=1.0, key="p2g_mfrru_energy")
         with col11:
-            p_mfrrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0, key="p2g_mfrrd_energy")
+            p_mfrrd_bsp = st.number_input("mFRRd", value=0.0, step=1.0, key="p2g_mfrrd_energy")
 
         # Submit button
         submit_button = st.form_submit_button("Submit")
