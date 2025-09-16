@@ -143,13 +143,13 @@ def render_p2h_calculator(BE_URL):
         col10, col11, col12, col13 = st.columns(4)
 
         with col10:
-            p_afrru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0, key="p2h_afrru_energy_thresh")
+            p_afrru_bsp = st.number_input("aFRRu", value=0.0, step=1.0, key="p2h_afrru_energy_thresh")
         with col11:
-            p_afrrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0, key="p2h_afrrd_energy_thresh")
+            p_afrrd_bsp = st.number_input("aFRRd", value=0.0, step=1.0, key="p2h_afrrd_energy_thresh")
         with col12:
-            p_mfrru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0, key="p2h_mfrru_energy_thresh")
+            p_mfrru_bsp = st.number_input("mFRRu", value=0.0, step=1.0, key="p2h_mfrru_energy_thresh")
         with col13:
-            p_mfrrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0, key="p2h_mfrrd_energy_thresh")
+            p_mfrrd_bsp = st.number_input("mFRRd", value=0.0, step=1.0, key="p2h_mfrrd_energy_thresh")
 
         # Submit button
         submit_button = st.form_submit_button("Submit")
