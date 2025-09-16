@@ -171,16 +171,16 @@ def render_dsr_calculator(BE_URL):
         col10, col11, col12, col13 = st.columns(4)
 
         with col10:
-            p_afrru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0,
+            p_afrru_bsp = st.number_input("aFRRu", value=0.0, step=1.0,
                                           key="dsr_afrru_energy_thresh")
         with col11:
-            p_afrrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0,
+            p_afrrd_bsp = st.number_input("aFRRd", value=0.0, step=1.0,
                                           key="dsr_afrrd_energy_thresh")
         with col12:
-            p_mfrru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0,
+            p_mfrru_bsp = st.number_input("mFRRu", value=0.0, step=1.0,
                                           key="dsr_mfrru_energy_thresh")
         with col13:
-            p_mfrrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0,
+            p_mfrrd_bsp = st.number_input("mFRRd", value=0.0, step=1.0,
                                           key="dsr_mfrrd_energy_thresh")
 
         # Submit button
@@ -321,7 +321,7 @@ def render_dsr_calculator(BE_URL):
                                     st.plotly_chart(fig_npv, use_container_width=True)
 
                             with col2:
-                                # REVENUE vs COST BY PRODUCTS CHART
+                                # REVENUE vs COST BY PRODUCTS CHART (without 'perkama DA')
                                 rev_cost_data = summary.get('revenue_cost_chart_data', {})
                                 if rev_cost_data and 'products' in rev_cost_data and 'values' in rev_cost_data:
                                     fig_rev_cost = px.bar(
@@ -338,18 +338,75 @@ def render_dsr_calculator(BE_URL):
 
                                     st.plotly_chart(fig_rev_cost, use_container_width=True)
 
-                            # Utilization chart
-                            util_data = summary.get('utilisation_chart_data', {})
-                            if util_data and 'products' in util_data and 'values' in util_data:
-                                st.write("#### UTILISATION BY PRODUCT")
-                                fig_util = px.bar(
-                                    x=util_data['products'],
-                                    y=util_data['values'],
-                                    labels={"x": "Product", "y": "Utilisation (%)"},
-                                    title="PRODUCT UTILISATION"
-                                )
-                                fig_util.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                st.plotly_chart(fig_util, use_container_width=True)
+                            # New profit breakdown chart and utilization chart
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                # Profit breakdown stacked chart
+                                profit_data = summary.get('profit_breakdown_chart_data', {})
+                                if profit_data:
+                                    fig_profit = go.Figure()
+
+                                    # Positive values (revenue/savings) - green - above zero line
+                                    fig_profit.add_trace(go.Bar(
+                                        name='DA Sutaupymai',
+                                        x=profit_data['categories'],
+                                        y=[profit_data.get('da_savings', 0)],
+                                        marker_color='lightgreen',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=0
+                                    ))
+
+                                    fig_profit.add_trace(go.Bar(
+                                        name='Pajamos iš balansavimo',
+                                        x=profit_data['categories'],
+                                        y=[profit_data.get('balancing_revenue', 0)],
+                                        marker_color='green',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=[profit_data.get('da_savings', 0)]  # Stack on top of DA savings
+                                    ))
+
+                                    # Negative values (costs) - red - below zero line
+                                    fig_profit.add_trace(go.Bar(
+                                        name='CAPEX',
+                                        x=profit_data['categories'],
+                                        y=[-profit_data.get('capex', 0)],  # Negative values
+                                        marker_color='lightcoral',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=0
+                                    ))
+
+                                    fig_profit.add_trace(go.Bar(
+                                        name='OPEX',
+                                        x=profit_data['categories'],
+                                        y=[-profit_data.get('opex', 0)],  # Negative values
+                                        marker_color='red',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=[-profit_data.get('capex', 0)]  # Stack below CAPEX
+                                    ))
+
+                                    fig_profit.update_layout(
+                                        title="PROJECT FINANCIAL BREAKDOWN",
+                                        barmode='relative',  # Use relative mode for proper positive/negative separation
+                                        yaxis_title="Value (tūkst. EUR)",
+                                        yaxis=dict(zeroline=True, zerolinecolor='black', zerolinewidth=2),  # Show zero line
+                                        showlegend=True
+                                    )
+
+                                    st.plotly_chart(fig_profit, use_container_width=True)
+
+                            with col2:
+                                # Utilization chart
+                                util_data = summary.get('utilisation_chart_data', {})
+                                if util_data and 'products' in util_data and 'values' in util_data:
+                                    fig_util = px.bar(
+                                        x=util_data['products'],
+                                        y=util_data['values'],
+                                        labels={"x": "Product", "y": "Utilisation (%)"},
+                                        title="PRODUCT UTILISATION"
+                                    )
+                                    fig_util.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                    st.plotly_chart(fig_util, use_container_width=True)
 
                     with tab2:
                         # Display markets information
@@ -478,82 +535,92 @@ def render_dsr_calculator(BE_URL):
                         if 'aggregated' in data and 'comparison' in data['aggregated']:
                             comparison = data['aggregated']['comparison']
 
-                            st.write("### SAVINGS COMPARISON")
+                            st.write("### DSR SAVINGS COMPARISON")
                             st.write("Comparison between baseline operation and optimized DSR operation")
 
-                            # Check the actual structure of comparison data
+                            # Display updated comparison metrics
                             if isinstance(comparison, dict):
-                                # Create comparison metrics based on available keys
-                                comparison_items = []
+                                cols = st.columns(3)
 
-                                # Common keys to look for
-                                baseline_keys = ['baseline', 'be DSR', 'tik katilas', 'without DSR']
-                                optimized_keys = ['optimized', 'su DSR', 'with DSR', 'DSR']
-                                savings_keys = ['DA sutaupoma', 'savings', 'profit', 'sutaupoma']
+                                # Baseline Cost (No DSR)
+                                if 'be DSR' in comparison:
+                                    baseline_data = comparison['be DSR']
+                                    with cols[0]:
+                                        st.metric(
+                                            baseline_data.get('label', 'Baseline Cost (No DSR)'),
+                                            f"{baseline_data['value']:.2f} tūkst. EUR",
+                                            help="Cost of operation without DSR optimization (shown as negative to indicate cost)"
+                                        )
 
-                                # Find baseline cost
-                                baseline_cost = None
-                                for key in baseline_keys:
-                                    if key in comparison:
-                                        baseline_cost = comparison[key]
-                                        comparison_items.append(("Baseline Cost", baseline_cost,
-                                                                 "Cost of operation without DSR optimization"))
-                                        break
+                                # Optimized Cost (With DSR)
+                                if 'su DSR' in comparison:
+                                    optimized_data = comparison['su DSR']
+                                    with cols[1]:
+                                        value = optimized_data['value']
+                                        st.metric(
+                                            optimized_data.get('label', 'Optimized Cost (With DSR)'),
+                                            f"{value:.2f} tūkst. EUR",
+                                            delta=f"{'Profit' if value > 0 else 'Cost'}",
+                                            delta_color="normal" if value > 0 else "inverse",
+                                            help=optimized_data.get('explanation', 'Net result with DSR optimization')
+                                        )
 
-                                # Find optimized cost
-                                optimized_cost = None
-                                for key in optimized_keys:
-                                    if key in comparison:
-                                        optimized_cost = comparison[key]
-                                        comparison_items.append(("Optimized Cost", optimized_cost,
-                                                                 "Cost of operation with DSR optimization"))
-                                        break
+                                # Nauda iš DSR
+                                if 'skirtumas' in comparison:
+                                    benefit_data = comparison['skirtumas']
+                                    with cols[2]:
+                                        value = benefit_data['value']
+                                        st.metric(
+                                            benefit_data.get('label', 'Nauda iš DSR'),
+                                            f"{abs(value):.2f} tūkst. EUR",
+                                            delta=f"{abs(value):.2f}",
+                                            delta_color="normal" if value >= 0 else "inverse",
+                                            help="Total benefit from DSR implementation"
+                                        )
 
-                                # Find savings
-                                savings = None
-                                for key in savings_keys:
-                                    if key in comparison:
-                                        savings = comparison[key]
-                                        comparison_items.append(
-                                            ("Savings", savings, "Savings from optimized scheduling"))
-                                        break
+                                # Comparison chart
+                                if 'comparison_chart_data' in comparison:
+                                    st.write("#### COST COMPARISON BREAKDOWN")
+                                    chart_data = comparison['comparison_chart_data']
 
-                                # Display all other items in comparison
-                                for key, value in comparison.items():
-                                    if key not in baseline_keys + optimized_keys + savings_keys:
-                                        comparison_items.append((key.replace('_', ' ').title(), value, f"{key} value"))
+                                    fig_comparison = go.Figure()
 
-                                # Display metrics
-                                if comparison_items:
-                                    cols = st.columns(min(len(comparison_items), 3))
-                                    for idx, (label, value, help_text) in enumerate(comparison_items[:3]):
-                                        col_idx = idx % 3
-                                        with cols[col_idx]:
-                                            if "savings" in label.lower() or "sutaupoma" in label.lower():
-                                                st.metric(label,
-                                                          f"{abs(value):.2f} tūkst. EUR",
-                                                          delta=f"{abs(value):.2f}",
-                                                          delta_color="normal" if value >= 0 else "inverse",
-                                                          help=help_text)
-                                            else:
-                                                st.metric(label,
-                                                          f"{value:.2f} tūkst. EUR",
-                                                          help=help_text)
+                                    # Baseline cost (negative, red)
+                                    fig_comparison.add_trace(go.Bar(
+                                        name='Neoptimizuotas energijos vartojimas',
+                                        x=[chart_data['categories'][0]],
+                                        y=[chart_data['baseline_cost']],  # Already negative from backend
+                                        marker_color='red',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                                    ))
 
-                                    # If more than 3 items, display the rest
-                                    if len(comparison_items) > 3:
-                                        st.write("#### Additional Comparison Data")
-                                        for label, value, help_text in comparison_items[3:]:
-                                            st.metric(label, f"{value:.2f}", help=help_text)
+                                    # Optimized cost (negative, red)
+                                    fig_comparison.add_trace(go.Bar(
+                                        name='Optimizuotas energijos vartojimas',
+                                        x=[chart_data['categories'][1]],
+                                        y=[chart_data['optimized_cost']],  # Already negative from backend
+                                        marker_color='lightcoral',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                                    ))
 
-                                # If we can calculate savings from baseline and optimized
-                                if baseline_cost is not None and optimized_cost is not None and savings is None:
-                                    calculated_savings = baseline_cost - optimized_cost
-                                    st.metric("Calculated Savings",
-                                              f"{abs(calculated_savings):.2f} tūkst. EUR",
-                                              delta=f"{abs(calculated_savings):.2f}",
-                                              delta_color="normal" if calculated_savings >= 0 else "inverse",
-                                              help="Calculated from baseline minus optimized costs")
+                                    # Balancing revenue (positive, green)
+                                    fig_comparison.add_trace(go.Bar(
+                                        name='Pajamos iš balansavimo energijos rinkų',
+                                        x=[chart_data['categories'][1]],
+                                        y=[chart_data['balancing_revenue']],  # Positive value
+                                        marker_color='green',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                                    ))
+
+                                    fig_comparison.update_layout(
+                                        title="BASELINE vs DSR COST COMPARISON",
+                                        barmode='relative',  # Use relative mode for proper negative/positive display
+                                        yaxis_title="Cost/Revenue (tūkst. EUR)",
+                                        yaxis=dict(zeroline=True, zerolinecolor='black', zerolinewidth=2),  # Show zero line
+                                        showlegend=True
+                                    )
+
+                                    st.plotly_chart(fig_comparison, use_container_width=True)
 
                                 # Display raw comparison data in expander for debugging
                                 with st.expander("Raw Comparison Data"):
