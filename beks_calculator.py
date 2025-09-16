@@ -77,13 +77,13 @@ def render_beks_calculator(BE_URL):
         col8, col9, col10, col11 = st.columns(4)
 
         with col8:
-            p_affru_bsp = st.number_input("aFRRu", min_value=0.0, value=0.0, step=1.0, key="afrru_energy")
+            p_affru_bsp = st.number_input("aFRRu", value=0.0, step=1.0, key="afrru_energy")
         with col9:
-            p_affrd_bsp = st.number_input("aFRRd", min_value=0.0, value=0.0, step=1.0, key="afrrd_energy")
+            p_affrd_bsp = st.number_input("aFRRd", value=0.0, step=1.0, key="afrrd_energy")
         with col10:
-            p_mffru_bsp = st.number_input("mFRRu", min_value=0.0, value=0.0, step=1.0, key="mfrru_energy")
+            p_mffru_bsp = st.number_input("mFRRu", value=0.0, step=1.0, key="mfrru_energy")
         with col11:
-            p_mffrd_bsp = st.number_input("mFRRd", min_value=0.0, value=0.0, step=1.0, key="mfrrd_energy")
+            p_mffrd_bsp = st.number_input("mFRRd", value=0.0, step=1.0, key="mfrrd_energy")
 
         # Submit button
         submit_button = st.form_submit_button("Submit")
