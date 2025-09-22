@@ -8,7 +8,7 @@ from p2g_calculator import render_p2g_calculator
 from dsr_calculator import render_dsr_calculator
 
 # BE_URL = "http://0.0.0.0:80/"
-BE_URL = "https://p2x-container-app.wonderfulpebble-6684d847.westeurope.azurecontainerapps.io/"
+BE_URL = "https://p2xapim.azure-api.net/P2X/"
 
 # Set page title and description
 st.set_page_config(page_title="Energy Optimization", layout="wide")
