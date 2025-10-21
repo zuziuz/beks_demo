@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def render_beks_calculator(BE_URL):
+def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
     st.header("BEKS Demo")
     st.write("Fill in the form below to submit a request to the BEKS API.")
 
@@ -125,8 +125,13 @@ def render_beks_calculator(BE_URL):
         # Make the POST request
         with st.spinner("Processing request..."):
             try:
+                # Build headers for local mode
+                headers = {}
+                if LOCAL_MODE:
+                    headers["P2X-APIM-Secret"] = P2X_APIM_SECRET
+
                 # response = requests.post(f"{BE_URL}beks", json=request_body)
-                response = requests.post(f"{BE_URL}beks", data={"parameters": json.dumps(request_body)})
+                response = requests.post(f"{BE_URL}beks", data={"parameters": json.dumps(request_body)}, headers=headers)
 
                 # Check if the request was successful
                 if response.status_code == 200:
