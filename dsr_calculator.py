@@ -487,10 +487,10 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                     col1, col2 = st.columns(2)
                                                     with col1:
                                                         st.metric("Upward",
-                                                                  f"{vol_data['upward']['value']} {vol_data['upward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{vol_data['upward']['value']} {vol_data['upward']['unit'].strip()}")
                                                     with col2:
                                                         st.metric("Downward",
-                                                                  f"{vol_data['downward']['value']} {vol_data['downward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{vol_data['downward']['value']} {vol_data['downward']['unit'].strip()}")
 
                                             # Utilisation
                                             if 'utilisation' in service_data:
@@ -500,10 +500,10 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                     col1, col2 = st.columns(2)
                                                     with col1:
                                                         st.metric("Upward",
-                                                                  f"{util_data['upward']['value']} {util_data['upward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{util_data['upward']['value']} {util_data['upward']['unit'].strip()}")
                                                     with col2:
                                                         st.metric("Downward",
-                                                                  f"{util_data['downward']['value']} {util_data['downward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{util_data['downward']['value']} {util_data['downward']['unit'].strip()}")
 
                                             # Potential revenue
                                             if 'potential_revenue' in service_data:
@@ -513,10 +513,10 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                     col1, col2 = st.columns(2)
                                                     with col1:
                                                         st.metric("Upward",
-                                                                  f"{rev_data['upward']['value']} {rev_data['upward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{rev_data['upward']['value']} {rev_data['upward']['unit'].strip()}")
                                                     with col2:
                                                         st.metric("Downward",
-                                                                  f"{rev_data['downward']['value']} {rev_data['downward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{rev_data['downward']['value']} {rev_data['downward']['unit'].strip()}")
 
                                             # Bids selected
                                             if 'bids_selected' in service_data:
@@ -526,10 +526,10 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                     col1, col2 = st.columns(2)
                                                     with col1:
                                                         st.metric("Upward",
-                                                                  f"{bids_data['upward']['value']} {bids_data['upward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{bids_data['upward']['value']} {bids_data['upward']['unit'].strip()}")
                                                     with col2:
                                                         st.metric("Downward",
-                                                                  f"{bids_data['downward']['value']} {bids_data['downward']['unit'].replace('X ', '').strip()}")
+                                                                  f"{bids_data['downward']['value']} {bids_data['downward']['unit'].strip()}")
 
                             # Intraday Market
                             if 'INTROS_DIENOS_RINKA' in markets:
