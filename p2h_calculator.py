@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 
-def render_p2h_calculator(BE_URL):
+def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
     st.header("P2H Demo")
     st.write("Fill in the form below to submit a request to the P2H API.")
 
@@ -189,8 +189,13 @@ def render_p2h_calculator(BE_URL):
 
         with st.spinner("Processing request..."):
             try:
+                # Build headers for local mode
+                headers = {}
+                if LOCAL_MODE:
+                    headers["P2X-APIM-Secret"] = P2X_APIM_SECRET
+
                 # response = requests.post(f"{BE_URL}p2h", json=request_body)
-                response = requests.post(f"{BE_URL}p2h", data={"parameters": json.dumps(request_body)})
+                response = requests.post(f"{BE_URL}p2h", data={"parameters": json.dumps(request_body)}, headers=headers)
                 if response.status_code == 200:
                     data = response.json()
                     st.success("Request successful!")
