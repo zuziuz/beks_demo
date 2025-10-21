@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 
-def render_dsr_calculator(BE_URL):
+def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
     st.header("DSR Demo")
     st.write("Fill in the form below to submit a request to the DSR API.")
 
@@ -242,8 +242,13 @@ def render_dsr_calculator(BE_URL):
 
         with st.spinner("Processing request..."):
             try:
+                # Build headers for local mode
+                headers = {}
+                if LOCAL_MODE:
+                    headers["P2X-APIM-Secret"] = P2X_APIM_SECRET
+
                 # response = requests.post(f"{BE_URL}dsr", json=request_body)
-                response = requests.post(f"{BE_URL}dsr", data={"parameters": json.dumps(request_body)})
+                response = requests.post(f"{BE_URL}dsr", data={"parameters": json.dumps(request_body)}, headers=headers)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -463,15 +468,77 @@ def render_dsr_calculator(BE_URL):
                                                         st.metric("Downward",
                                                                   f"{rev_data['downward']['value']} {rev_data['downward']['unit']}")
 
-                            # Other markets
-                            for market_key in ['BALANSAVIMO_ENERGIJOS_RINKA', 'INTROS_DIENOS_RINKA']:
-                                if market_key in markets:
-                                    market = markets[market_key]
-                                    st.write(f"### {market_key.replace('_', ' ')}")
+                            # Balansavimo Energijos Rinka
+                            if 'BALANSAVIMO_ENERGIJOS_RINKA' in markets:
+                                st.write("### BALANSAVIMO ENERGIJOS RINKA")
+                                ber = markets['BALANSAVIMO_ENERGIJOS_RINKA']
 
-                                    if 'summary' in market:
-                                        for key, value in market['summary'].items():
-                                            st.metric(key, f"{value['value']} {value['unit']}")
+                                # Display aFRR and mFRR (same as power market but for energy)
+                                for service in ['aFRR', 'mFRR']:
+                                    if service in ber:
+                                        with st.expander(f"{service} - {ber[service]['description']}"):
+                                            service_data = ber[service]
+
+                                            # Volume of procured energy
+                                            if 'volume_of_procured_energy' in service_data:
+                                                st.write("**VOLUME OF PROCURED ENERGY**")
+                                                vol_data = service_data['volume_of_procured_energy']
+                                                if 'upward' in vol_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{vol_data['upward']['value']} {vol_data['upward']['unit'].replace('X ', '').strip()}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{vol_data['downward']['value']} {vol_data['downward']['unit'].replace('X ', '').strip()}")
+
+                                            # Utilisation
+                                            if 'utilisation' in service_data:
+                                                st.write("**UTILISATION (% OF TIME)**")
+                                                util_data = service_data['utilisation']
+                                                if 'upward' in util_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{util_data['upward']['value']} {util_data['upward']['unit'].replace('X ', '').strip()}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{util_data['downward']['value']} {util_data['downward']['unit'].replace('X ', '').strip()}")
+
+                                            # Potential revenue
+                                            if 'potential_revenue' in service_data:
+                                                st.write("**POTENTIAL REVENUE**")
+                                                rev_data = service_data['potential_revenue']
+                                                if 'upward' in rev_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{rev_data['upward']['value']} {rev_data['upward']['unit'].replace('X ', '').strip()}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{rev_data['downward']['value']} {rev_data['downward']['unit'].replace('X ', '').strip()}")
+
+                                            # Bids selected
+                                            if 'bids_selected' in service_data:
+                                                st.write("**% OF BIDS SELECTED**")
+                                                bids_data = service_data['bids_selected']
+                                                if 'upward' in bids_data:
+                                                    col1, col2 = st.columns(2)
+                                                    with col1:
+                                                        st.metric("Upward",
+                                                                  f"{bids_data['upward']['value']} {bids_data['upward']['unit'].replace('X ', '').strip()}")
+                                                    with col2:
+                                                        st.metric("Downward",
+                                                                  f"{bids_data['downward']['value']} {bids_data['downward']['unit'].replace('X ', '').strip()}")
+
+                            # Intraday Market
+                            if 'INTROS_DIENOS_RINKA' in markets:
+                                market = markets['INTROS_DIENOS_RINKA']
+                                st.write("### INTROS DIENOS RINKA")
+
+                                if 'summary' in market:
+                                    for key, value in market['summary'].items():
+                                        st.metric(key, f"{value['value']} {value['unit']}")
 
                     with tab3:
                         # Display economic results
