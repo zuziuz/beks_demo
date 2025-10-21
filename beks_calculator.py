@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import json
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -407,7 +406,7 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             <th class="power-header">{fcr_data['potential_revenue']['header']}</th>
                                         </tr>
                                         <tr>
-                                            <td>{fcr_data['potential_revenue']['value']:.2f} EUR</td>
+                                            <td>{fcr_data['potential_revenue']['value']:.2f} {fcr_data['potential_revenue']['unit']}</td>
                                         </tr>
                                     </table>
 
@@ -480,8 +479,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             <th class="power-direction-header">DOWNWARD</th>
                                         </tr>
                                         <tr>
-                                            <td>{afrr_data['potential_revenue']['upward']['value']:.2f} EUR</td>
-                                            <td>{afrr_data['potential_revenue']['downward']['value']:.2f} EUR</td>
+                                            <td>{afrr_data['potential_revenue']['upward']['value']:.2f} {afrr_data['potential_revenue']['upward']['unit']}</td>
+                                            <td>{afrr_data['potential_revenue']['downward']['value']:.2f} {afrr_data['potential_revenue']['downward']['unit']}</td>
                                         </tr>
                                     </table>
 
@@ -559,8 +558,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             <th class="power-direction-header">DOWNWARD</th>
                                         </tr>
                                         <tr>
-                                            <td>{mfrr_data['potential_revenue']['upward']['value']:.2f} EUR</td>
-                                            <td>{mfrr_data['potential_revenue']['downward']['value']:.2f} EUR</td>
+                                            <td>{mfrr_data['potential_revenue']['upward']['value']:.2f} {mfrr_data['potential_revenue']['upward']['unit']}</td>
+                                            <td>{mfrr_data['potential_revenue']['downward']['value']:.2f} {mfrr_data['potential_revenue']['downward']['unit']}</td>
                                         </tr>
                                     </table>
 
@@ -640,8 +639,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             <th class="energy-direction-header">DOWNWARD</th>
                                         </tr>
                                         <tr>
-                                            <td>{afrr_data['potential_revenue']['upward']['value']:.2f} EUR</td>
-                                            <td>{afrr_data['potential_revenue']['downward']['value']:.2f} EUR</td>
+                                            <td>{afrr_data['potential_revenue']['upward']['value']:.2f} {afrr_data['potential_revenue']['upward']['unit']}</td>
+                                            <td>{afrr_data['potential_revenue']['downward']['value']:.2f} {afrr_data['potential_revenue']['downward']['unit']}</td>
                                         </tr>
                                     </table>
 
@@ -719,8 +718,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             <th class="energy-direction-header">DOWNWARD</th>
                                         </tr>
                                         <tr>
-                                            <td>{mfrr_data['potential_revenue']['upward']['value']:.2f} EUR</td>
-                                            <td>{mfrr_data['potential_revenue']['downward']['value']:.2f} EUR</td>
+                                            <td>{mfrr_data['potential_revenue']['upward']['value']:.2f} {mfrr_data['potential_revenue']['upward']['unit']}</td>
+                                            <td>{mfrr_data['potential_revenue']['downward']['value']:.2f} {mfrr_data['potential_revenue']['downward']['unit']}</td>
                                         </tr>
                                     </table>
 
@@ -801,8 +800,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                 <th class="trading-direction-header">REVENUE</th>
                                             </tr>
                                             <tr>
-                                                <td>{day_ahead_data['potential_cost_revenue']['cost']['value']:.2f} EUR</td>
-                                                <td>{day_ahead_data['potential_cost_revenue']['revenue']['value']:.2f} EUR</td>
+                                                <td>{day_ahead_data['potential_cost_revenue']['cost']['value']:.2f} {day_ahead_data['potential_cost_revenue']['cost']['unit']}</td>
+                                                <td>{day_ahead_data['potential_cost_revenue']['revenue']['value']:.2f} {day_ahead_data['potential_cost_revenue']['revenue']['unit']}</td>
                                             </tr>
                                         </table>
                                         """,
@@ -866,8 +865,8 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                 <th class="trading-direction-header">REVENUE</th>
                                             </tr>
                                             <tr>
-                                                <td>{intraday_data['potential_cost_revenue']['cost']['value']:.2f} EUR</td>
-                                                <td>{intraday_data['potential_cost_revenue']['revenue']['value']:.2f} EUR</td>
+                                                <td>{intraday_data['potential_cost_revenue']['cost']['value']:.2f} {intraday_data['potential_cost_revenue']['cost']['unit']}</td>
+                                                <td>{intraday_data['potential_cost_revenue']['revenue']['value']:.2f} {intraday_data['potential_cost_revenue']['revenue']['unit']}</td>
                                             </tr>
                                         </table>
                                         """,
