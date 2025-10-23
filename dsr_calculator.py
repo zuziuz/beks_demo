@@ -531,14 +531,83 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                                         st.metric("Downward",
                                                                   f"{bids_data['downward']['value']} {bids_data['downward']['unit'].strip()}")
 
-                            # Intraday Market
-                            if 'INTROS_DIENOS_RINKA' in markets:
-                                market = markets['INTROS_DIENOS_RINKA']
-                                st.write("### INTROS DIENOS RINKA")
+                            # Elektros Energijos Prekyba (Electricity Trading)
+                            if 'ELEKTROS_ENERGIJOS_PREKYBA' in markets:
+                                st.write("### ELEKTROS ENERGIJOS PREKYBA")
+                                eep = markets['ELEKTROS_ENERGIJOS_PREKYBA']
 
-                                if 'summary' in market:
-                                    for key, value in market['summary'].items():
-                                        st.metric(key, f"{value['value']} {value['unit']}")
+                                # Day Ahead Market
+                                if 'Day_Ahead' in eep:
+                                    with st.expander(f"Day Ahead - {eep['Day_Ahead']['description']}"):
+                                        da_data = eep['Day_Ahead']
+
+                                        # Volume of energy exchange
+                                        if 'volume_of_energy_exchange' in da_data:
+                                            st.write("**VOLUME OF ENERGY EXCHANGE**")
+                                            vol_data = da_data['volume_of_energy_exchange']
+                                            if 'purchase' in vol_data:
+                                                st.metric("Purchase",
+                                                          f"{vol_data['purchase']['value']} {vol_data['purchase']['unit']}")
+
+                                        # Percentage of time
+                                        if 'percentage_of_time' in da_data:
+                                            st.write("**% OF TIME**")
+                                            time_data = da_data['percentage_of_time']
+                                            if 'purchase' in time_data:
+                                                st.metric("Purchase",
+                                                          f"{time_data['purchase']['value']} {time_data['purchase']['unit']}")
+
+                                        # Potential cost
+                                        if 'potential_cost_revenue' in da_data:
+                                            st.write("**POTENTIAL COST**")
+                                            cost_data = da_data['potential_cost_revenue']
+                                            if 'cost' in cost_data:
+                                                st.metric("Cost",
+                                                          f"{cost_data['cost']['value']} {cost_data['cost']['unit']}")
+
+                                # Intraday Market
+                                if 'Intraday' in eep:
+                                    with st.expander(f"Intraday - {eep['Intraday']['description']}"):
+                                        id_data = eep['Intraday']
+
+                                        # Volume of energy exchange
+                                        if 'volume_of_energy_exchange' in id_data:
+                                            st.write("**VOLUME OF ENERGY EXCHANGE**")
+                                            vol_data = id_data['volume_of_energy_exchange']
+                                            if 'purchase' in vol_data and 'sale' in vol_data:
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.metric("Purchase",
+                                                              f"{vol_data['purchase']['value']} {vol_data['purchase']['unit']}")
+                                                with col2:
+                                                    st.metric("Sale",
+                                                              f"{vol_data['sale']['value']} {vol_data['sale']['unit']}")
+
+                                        # Percentage of time
+                                        if 'percentage_of_time' in id_data:
+                                            st.write("**% OF TIME**")
+                                            time_data = id_data['percentage_of_time']
+                                            if 'purchase' in time_data and 'sale' in time_data:
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.metric("Purchase",
+                                                              f"{time_data['purchase']['value']} {time_data['purchase']['unit']}")
+                                                with col2:
+                                                    st.metric("Sale",
+                                                              f"{time_data['sale']['value']} {time_data['sale']['unit']}")
+
+                                        # Potential cost & revenue
+                                        if 'potential_cost_revenue' in id_data:
+                                            st.write("**POTENTIAL COST & REVENUE**")
+                                            cost_rev_data = id_data['potential_cost_revenue']
+                                            if 'cost' in cost_rev_data and 'revenue' in cost_rev_data:
+                                                col1, col2 = st.columns(2)
+                                                with col1:
+                                                    st.metric("Cost",
+                                                              f"{cost_rev_data['cost']['value']} {cost_rev_data['cost']['unit']}")
+                                                with col2:
+                                                    st.metric("Revenue",
+                                                              f"{cost_rev_data['revenue']['value']} {cost_rev_data['revenue']['unit']}")
 
                     with tab3:
                         # Display economic results
@@ -620,16 +689,15 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                         )
 
                                 # Optimized Cost (With DSR)
-                                if 'su DSR' in comparison:
+                                if 'su DSR' in comparison and 'comparison_chart_data' in comparison:
                                     optimized_data = comparison['su DSR']
+                                    # Use the optimized cost from chart data (same as displayed in the chart)
+                                    optimized_cost = comparison['comparison_chart_data']['optimized_cost']
                                     with cols[1]:
-                                        value = optimized_data['value']
                                         st.metric(
                                             optimized_data.get('label', 'Optimized Cost (With DSR)'),
-                                            f"{value:.2f} tūkst. EUR",
-                                            delta=f"{'Profit' if value > 0 else 'Cost'}",
-                                            delta_color="normal" if value > 0 else "inverse",
-                                            help=optimized_data.get('explanation', 'Net result with DSR optimization')
+                                            f"{optimized_cost:.2f} tūkst. EUR",
+                                            help="Cost of electricity consumption with DSR optimization (shown as negative to indicate cost)"
                                         )
 
                                 # Nauda iš DSR
