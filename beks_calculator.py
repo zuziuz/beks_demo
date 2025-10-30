@@ -160,11 +160,23 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                         # YEARLY SUMMARY TABLE
                         st.write("##### YEARLY SUMMARY")
                         yearly_summary_table = data['aggregated']['summary']['yearly_summary_table']
+                        # Format values with units
+                        for row in yearly_summary_table:
+                            if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                value = row['Value']
+                                sign = "+" if value > 0 else ""
+                                row['Value'] = f"{sign}{value:.2f} tūkst. EUR/year"
                         st.table(yearly_summary_table)
 
                         # PROJECT LIFETIME SUMMARY TABLE
                         st.write("##### PROJECT (LIFETIME) SUMMARY")
                         project_summary_table = data['aggregated']['summary']['project_summary_table']
+                        # Format values with units
+                        for row in project_summary_table:
+                            if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                value = row['Value']
+                                sign = "+" if value > 0 else ""
+                                row['Value'] = f"{sign}{value:.2f} tūkst. EUR"
                         st.table(project_summary_table)
 
                         st.write("##### SUPPLEMENTED WITH GRAPHS")
