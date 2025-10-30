@@ -267,12 +267,22 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             with col1:
                                 st.write("#### YEARLY SUMMARY")
                                 if 'yearly_summary_table' in summary:
-                                    st.table(summary['yearly_summary_table'])
+                                    yearly_summary_table = summary['yearly_summary_table']
+                                    # Format values with units
+                                    for row in yearly_summary_table:
+                                        if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                            row['Value'] = f"{row['Value']:.2f} tūkst. EUR/year"
+                                    st.table(yearly_summary_table)
 
                             with col2:
                                 st.write("#### PROJECT SUMMARY")
                                 if 'project_summary_table' in summary:
-                                    st.table(summary['project_summary_table'])
+                                    project_summary_table = summary['project_summary_table']
+                                    # Format values with units
+                                    for row in project_summary_table:
+                                        if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                            row['Value'] = f"{row['Value']:.2f} tūkst. EUR"
+                                    st.table(project_summary_table)
 
                             # Display charts
                             col1, col2 = st.columns(2)
