@@ -195,9 +195,23 @@ def render_p2g_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                         if "aggregated" in data and "summary" in data["aggregated"]:
                             summary = data["aggregated"]["summary"]
                             st.write("##### YEARLY SUMMARY")
-                            st.table(summary.get('yearly_summary_table', []))
+                            yearly_summary_table = summary.get('yearly_summary_table', [])
+                            # Format values with units
+                            for row in yearly_summary_table:
+                                if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                    value = row['Value']
+                                    sign = "+" if value > 0 else ""
+                                    row['Value'] = f"{sign}{value:.2f} tūkst. EUR/year"
+                            st.table(yearly_summary_table)
                             st.write("##### PROJECT (LIFETIME) SUMMARY")
-                            st.table(summary.get('project_summary_table', []))
+                            project_summary_table = summary.get('project_summary_table', [])
+                            # Format values with units
+                            for row in project_summary_table:
+                                if 'Value' in row and isinstance(row['Value'], (int, float)):
+                                    value = row['Value']
+                                    sign = "+" if value > 0 else ""
+                                    row['Value'] = f"{sign}{value:.2f} tūkst. EUR"
+                            st.table(project_summary_table)
                             st.write("##### SUPPLEMENTED WITH GRAPHS")
 
                             col1, col2 = st.columns(2)
