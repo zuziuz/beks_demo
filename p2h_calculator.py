@@ -207,7 +207,7 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                     )
 
                     st.header("Visualization")
-                    tab1, tab2, tab3 = st.tabs(["Summary", "Market Details", "Economic Results"])
+                    tab1, tab2, tab3, tab4 = st.tabs(["Summary", "Market Details", "Economic Results", "Comparison"])
 
                     with tab1:
                         st.subheader("SUMMARY")
@@ -222,13 +222,10 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             st.table(yearly_summary_table)
                             st.write("##### PROJECT (LIFETIME) SUMMARY")
                             project_summary_table = summary.get('project_summary_table', [])
-                            # Format values with units (special handling for different metrics)
+                            # Format values with units
                             for row in project_summary_table:
                                 if 'Value' in row and isinstance(row['Value'], (int, float)):
-                                    if row.get('Metric') == "ANNUAL OPERATIONAL COST":
-                                        row['Value'] = f"{row['Value']:.2f} tūkst. EUR/year"
-                                    else:
-                                        row['Value'] = f"{row['Value']:.2f} tūkst. EUR"
+                                    row['Value'] = f"{row['Value']:.2f} tūkst. EUR"
                             st.table(project_summary_table)
                             st.write("##### SUPPLEMENTED WITH GRAPHS")
                             col1, col2 = st.columns(2)
@@ -261,20 +258,6 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                 else:
                                     st.info("NPV chart data is incomplete or missing key fields.")
                             with col2:
-                                rev_cost_data = summary.get('revenue_cost_chart_data', {})
-                                if rev_cost_data and 'products' in rev_cost_data and 'values' in rev_cost_data:
-                                    fig_rev_cost = px.bar(x=rev_cost_data['products'], y=rev_cost_data['values'],
-                                                          labels={"x": "Category", "y": "Value (tūkst. EUR)"},
-                                                          title="COST COMPARISON")
-                                    colors = ['red' if v < 0 else 'green' for v in rev_cost_data['values']]
-                                    fig_rev_cost.update_traces(marker_color=colors,
-                                                               hovertemplate='%{y:,.2f}<extra></extra>')
-                                    st.plotly_chart(fig_rev_cost, use_container_width=True)
-                                else:
-                                    st.info("Revenue/Cost chart data is incomplete or missing key fields.")
-
-                            col3, col4 = st.columns(2)
-                            with col3:
                                 util_data = summary.get('utilisation_chart_data', {})
                                 if util_data and util_data.get('products') and util_data.get('values'):
                                     fig_util = px.bar(
@@ -288,27 +271,128 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                 else:
                                     st.info("Utilisation chart data is incomplete or missing key fields.")
 
-                            with col4:
-                                if "bid_percentages" in data.get("aggregated", {}):
-                                    bid_data = data["aggregated"]["bid_percentages"]
-                                    bid_products = [str(k) for k, v in bid_data.items() if
-                                                    isinstance(v, (int, float)) and v > 0]
-                                    bid_values = [v for k, v in bid_data.items() if
-                                                  isinstance(v, (int, float)) and v > 0]
+                            # Row 2: PROJECT FINANCIAL BREAKDOWN and REVENUE vs COST BY PRODUCTS
+                            col3, col4 = st.columns(2)
 
-                                    if bid_products:
-                                        fig_bids = px.bar(
-                                            x=bid_products,
-                                            y=bid_values,
-                                            labels={"x": "Product", "y": "Selection Rate (%)"},
-                                            title="BID SELECTION RATE BY PRODUCT"
+                            with col3:
+                                # PROJECT FINANCIAL BREAKDOWN (stacked bar)
+                                if 'yearly' in data.get('aggregated', {}) and 'comparison' in data.get('aggregated', {}):
+                                    yearly = data['aggregated']['yearly']
+                                    comparison = data['aggregated']['comparison']
+                                    number_of_years = len(yearly) - 1 if len(yearly) > 1 else 1
+
+                                    # Get values
+                                    capex = yearly[0].get('CAPEX (tūkst. EUR)', 0) if yearly else 0
+                                    opex_annual = yearly[1].get('OPEX (tūkst. EUR)', 0) if len(yearly) > 1 else 0
+                                    opex_total = opex_annual * number_of_years
+                                    savings_total = abs(comparison.get('skirtumas', 0)) * number_of_years
+
+                                    # Calculate balancing revenue (only balancing market products)
+                                    balancing_revenue = 0
+                                    if 'economic_results' in data['aggregated'] and 'gross_revenue_by_product' in data['aggregated']['economic_results']:
+                                        for row in data['aggregated']['economic_results']['gross_revenue_by_product']:
+                                            product = row.get('Product', '')
+                                            if any(x in product for x in ['aFRR', 'mFRR', 'FCR']):
+                                                balancing_revenue += row.get('Value (tūkst. EUR)', 0)
+                                    balancing_revenue_total = balancing_revenue * number_of_years
+
+                                    fig_profit = go.Figure()
+
+                                    # Positive values (above zero)
+                                    fig_profit.add_trace(go.Bar(
+                                        name='Sutaupymai',
+                                        x=['Project'],
+                                        y=[savings_total],
+                                        marker_color='lightgreen',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=0
+                                    ))
+                                    fig_profit.add_trace(go.Bar(
+                                        name='Pajamos iš balansavimo',
+                                        x=['Project'],
+                                        y=[balancing_revenue_total],
+                                        marker_color='green',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=[savings_total]
+                                    ))
+
+                                    # Negative values (below zero)
+                                    fig_profit.add_trace(go.Bar(
+                                        name='CAPEX',
+                                        x=['Project'],
+                                        y=[-capex],
+                                        marker_color='lightcoral',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=0
+                                    ))
+                                    fig_profit.add_trace(go.Bar(
+                                        name='OPEX',
+                                        x=['Project'],
+                                        y=[-opex_total],
+                                        marker_color='red',
+                                        hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
+                                        base=[-capex]
+                                    ))
+
+                                    fig_profit.update_layout(
+                                        title="PROJECT FINANCIAL BREAKDOWN",
+                                        barmode='relative',
+                                        yaxis_title="Value (tūkst. EUR)",
+                                        yaxis=dict(zeroline=True, zerolinecolor='black', zerolinewidth=2),
+                                        showlegend=True
+                                    )
+                                    st.plotly_chart(fig_profit, use_container_width=True)
+                                else:
+                                    st.info("Financial breakdown data not available.")
+
+                            with col4:
+                                # REVENUE vs COST BY PRODUCTS (using total_finance) - PROJECT LIFETIME
+                                if 'total_finance' in data.get('aggregated', {}) and 'comparison' in data.get('aggregated', {}) and 'yearly' in data.get('aggregated', {}):
+                                    total_finance = data['aggregated']['total_finance']
+                                    comparison = data['aggregated']['comparison']
+                                    yearly = data['aggregated']['yearly']
+                                    number_of_years = len(yearly) - 1 if len(yearly) > 1 else 1
+
+                                    products = []
+                                    values = []
+
+                                    # Costs from total_finance (negative values) - PROJECT LIFETIME
+                                    # Note: perkama DA excluded (shown in PROJECT FINANCIAL BREAKDOWN)
+                                    cost_products = ['perkama ID']
+                                    for prod in cost_products:
+                                        val = total_finance.get(prod, 0) * number_of_years
+                                        if abs(val) > 0.001:  # Filter near-zero
+                                            products.append(prod)
+                                            values.append(val)
+
+                                    # Revenue - each balancing product separately - PROJECT LIFETIME
+                                    balancing_products = ['FCR CAP', 'aFRRu CAP', 'aFRRd CAP', 'mFRRu CAP', 'mFRRd CAP',
+                                                          'parduodama ID', 'aFRRu', 'aFRRd', 'mFRRu', 'mFRRd']
+                                    for prod in balancing_products:
+                                        val = total_finance.get(prod, 0) * number_of_years
+                                        if abs(val) > 0.001:  # Filter near-zero
+                                            products.append(prod)
+                                            values.append(val)
+
+                                    # Sutaupymai (Savings) - PROJECT LIFETIME
+                                    sutaupymai_val = -comparison.get('skirtumas', 0) * number_of_years
+                                    if abs(sutaupymai_val) > 0.001:
+                                        products.append('Sutaupymai')
+                                        values.append(sutaupymai_val)
+
+                                    if products:
+                                        fig_rev_cost = px.bar(
+                                            x=products, y=values,
+                                            labels={"x": "Product", "y": "Value (tūkst. EUR)"},
+                                            title="REVENUE vs COST BY PRODUCTS"
                                         )
-                                        fig_bids.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                        st.plotly_chart(fig_bids, use_container_width=True)
-                                    # else: # Optional info if no valid bid data
-                                    #     st.info("No valid bid selection data to display (>0).")
-                                # else: # Optional info if key is missing
-                                #     st.info("Bid percentages data not found in response.")
+                                        colors = ['red' if v < 0 else 'green' for v in values]
+                                        fig_rev_cost.update_traces(marker_color=colors, hovertemplate='%{y:,.2f}<extra></extra>')
+                                        st.plotly_chart(fig_rev_cost, use_container_width=True)
+                                    else:
+                                        st.info("No revenue/cost data available.")
+                                else:
+                                    st.info("Finance data not found.")
 
                     with tab2:
                         st.subheader("MARKET DETAILS")
@@ -519,61 +603,208 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     st.info("Elektros energijos prekybos duomenų nėra.")
 
                     with tab3:
-                        st.subheader("ECONOMIC RESULTS BY PRODUCT")
+                        st.subheader("ECONOMIC RESULTS")
 
                         if "aggregated" in data and "economic_results" in data["aggregated"]:
                             econ_data = data["aggregated"]["economic_results"]
 
-                            st.write("##### REVENUE BY PRODUCT")
-                            if "revenue_table" in econ_data and econ_data["revenue_table"]:
-                                st.table(econ_data["revenue_table"])
+                            # GROSS REVENUE BY PRODUCT - table + green bar chart
+                            st.write("##### GROSS REVENUE BY PRODUCT")
+                            gross_revenue_data = econ_data.get('gross_revenue_by_product', [])
+                            if gross_revenue_data:
+                                st.table(gross_revenue_data)
                                 fig_rev = px.bar(
-                                    econ_data["revenue_table"], x="Product", y="Value (tūkst. EUR)",
-                                    title="REVENUE BY PRODUCT"
+                                    gross_revenue_data,
+                                    x="Product",
+                                    y="Value (tūkst. EUR)",
+                                    title="GROSS REVENUE BY PRODUCT",
+                                    color_discrete_sequence=['#2ecc71']  # Green
                                 )
                                 fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                 st.plotly_chart(fig_rev, use_container_width=True)
                             else:
-                                st.info("No revenue data available")
+                                st.info("No gross revenue data available")
 
-                            st.write("##### COST BY PRODUCT")
-                            if "cost_table" in econ_data and econ_data["cost_table"]:
-                                st.table(econ_data["cost_table"])
-                                fig_cost = px.bar(
-                                    econ_data["cost_table"], x="Product", y="Value (tūkst. EUR)",
-                                    title="COST BY PRODUCT"
+                            # VARIABLE COSTS BY PRODUCT - table + red bar chart
+                            st.write("##### VARIABLE COSTS BY PRODUCT")
+                            variable_costs_data = econ_data.get('variable_costs_by_product', [])
+                            if variable_costs_data:
+                                st.table(variable_costs_data)
+                                fig_var = px.bar(
+                                    variable_costs_data,
+                                    x="Product",
+                                    y="Value (tūkst. EUR)",
+                                    title="VARIABLE COSTS BY PRODUCT",
+                                    color_discrete_sequence=['#e74c3c']  # Red
                                 )
-                                fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                st.plotly_chart(fig_cost, use_container_width=True)
+                                fig_var.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                st.plotly_chart(fig_var, use_container_width=True)
                             else:
-                                st.info("No cost data available")
+                                st.info("No variable costs data available")
 
-                            st.metric("TOTAL SAVINGS", f"{econ_data.get('total_profit', 0):.2f} tūkst. EUR")
+                            # FIXED COSTS - table only
+                            st.write("##### FIXED COSTS")
+                            fixed_costs_data = econ_data.get('fixed_costs_table', [])
+                            if fixed_costs_data:
+                                st.table(fixed_costs_data)
+                            else:
+                                st.info("No fixed costs data available")
 
+                            # YEARLY RESULTS - table + NPV line chart
                             st.write("##### YEARLY RESULTS")
                             if "yearly_table" in econ_data and econ_data["yearly_table"]:
-                                yearly_df = pd.DataFrame(econ_data["yearly_table"])
-                                st.table(yearly_df)
+                                st.table(econ_data["yearly_table"])
 
-                                if "YEAR" in yearly_df.columns and "NPV" in yearly_df.columns:
+                                yearly_df = pd.DataFrame(econ_data["yearly_table"])
+                                npv_col = "NPV (tūkst. EUR)"
+                                if "YEAR" in yearly_df.columns and npv_col in yearly_df.columns:
                                     fig_yearly_npv = px.line(
-                                        yearly_df, x="YEAR", y="NPV", markers=True,
+                                        yearly_df, x="YEAR", y=npv_col, markers=True,
                                         title="NET PRESENT VALUE OVER TIME"
                                     )
                                     fig_yearly_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                     st.plotly_chart(fig_yearly_npv, use_container_width=True)
-
-                                y_metrics = [col for col in ["CAPEX", "OPEX", "CF"] if col in yearly_df.columns]
-                                if "YEAR" in yearly_df.columns and y_metrics:
-                                    fig_yearly_metrics = px.bar(
-                                        yearly_df, x="YEAR", y=y_metrics,
-                                        title="YEARLY FINANCIAL METRICS", barmode="group"
-                                    )
-                                    st.plotly_chart(fig_yearly_metrics, use_container_width=True)
                             else:
                                 st.info("No yearly results data available.")
                         else:
                             st.info("Economic results data not found.")
+
+                    with tab4:
+                        # P2H Comparison tab - Project Lifetime totals
+                        if 'aggregated' in data and 'comparison' in data['aggregated']:
+                            comparison = data['aggregated']['comparison']
+
+                            st.write("### P2H SAVINGS COMPARISON (Project Lifetime)")
+                            st.write("Total comparison between boiler-only operation and optimized heat pump operation over project lifetime")
+
+                            # Get number of years from yearly data
+                            number_of_years = 1
+                            if 'yearly' in data['aggregated'] and len(data['aggregated']['yearly']) > 1:
+                                number_of_years = len(data['aggregated']['yearly']) - 1  # Subtract year 0 (CAPEX only)
+
+                            # Calculate balancing revenue from economic results (annual)
+                            balancing_revenue_annual = 0.0
+                            if 'aggregated' in data and 'economic_results' in data['aggregated']:
+                                econ_results = data['aggregated']['economic_results']
+                                if 'gross_revenue_by_product' in econ_results:
+                                    for row in econ_results['gross_revenue_by_product']:
+                                        product = row.get('Product', '')
+                                        # Sum all balancing market revenues (CAP and energy)
+                                        if any(x in product for x in ['aFRRu', 'aFRRd', 'mFRRu', 'mFRRd', 'FCR']):
+                                            balancing_revenue_annual += row.get('Value (tūkst. EUR)', 0)
+
+                            # Get annual comparison values
+                            cost_boiler_annual = comparison.get('tik katilas', 0)
+                            cost_with_hp_annual = comparison.get('katilas + šilumos siurblys', 0)
+                            savings_annual = abs(comparison.get('skirtumas', 0))
+
+                            # Calculate project lifetime totals
+                            cost_boiler_total = cost_boiler_annual * number_of_years
+                            cost_with_hp_total = cost_with_hp_annual * number_of_years
+                            savings_total = savings_annual * number_of_years
+                            balancing_revenue_total = balancing_revenue_annual * number_of_years
+                            benefits_total = savings_total + balancing_revenue_total
+
+                            # 5 KPI metrics in two rows for better readability
+                            # Row 1: 3 metrics
+                            row1_cols = st.columns(3)
+
+                            with row1_cols[0]:
+                                st.metric(
+                                    "Cost with Boiler",
+                                    f"{cost_boiler_total:.2f} tūkst. EUR",
+                                    help=f"Total project cost of heating with boiler only ({number_of_years} years)"
+                                )
+
+                            with row1_cols[1]:
+                                st.metric(
+                                    "Cost with Boiler + Heat Pump",
+                                    f"{cost_with_hp_total:.2f} tūkst. EUR",
+                                    help=f"Total project cost with optimized heat pump operation ({number_of_years} years)"
+                                )
+
+                            with row1_cols[2]:
+                                st.metric(
+                                    "Savings",
+                                    f"{savings_total:.2f} tūkst. EUR",
+                                    help=f"Total cost savings from heat pump optimization ({number_of_years} years)"
+                                )
+
+                            # Row 2: 2 metrics
+                            row2_cols = st.columns(2)
+
+                            with row2_cols[0]:
+                                st.metric(
+                                    "Revenue from Balancing",
+                                    f"{balancing_revenue_total:.2f} tūkst. EUR",
+                                    help=f"Total revenue from balancing market participation ({number_of_years} years)"
+                                )
+
+                            with row2_cols[1]:
+                                st.metric(
+                                    "Benefits of Heat Pump",
+                                    f"{benefits_total:.2f} tūkst. EUR",
+                                    delta=f"{benefits_total:.2f}",
+                                    delta_color="normal",
+                                    help=f"Total benefit: Savings + Revenue from balancing ({number_of_years} years)"
+                                )
+
+                            # Comparison chart (stacked bar with 3 categories)
+                            st.write("#### COST COMPARISON BREAKDOWN (Project Lifetime)")
+
+                            fig_comparison = go.Figure()
+
+                            # Left bar: Cost with boiler (red, negative)
+                            fig_comparison.add_trace(go.Bar(
+                                name='Cost with Boiler Only',
+                                x=['Boiler Only'],
+                                y=[cost_boiler_total],
+                                marker_color='red',
+                                hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                            ))
+
+                            # Middle bar bottom: Cost with boiler + heat pump (lightcoral, negative)
+                            fig_comparison.add_trace(go.Bar(
+                                name='Cost with Boiler + Heat Pump',
+                                x=['Boiler + Heat Pump'],
+                                y=[cost_with_hp_total],
+                                marker_color='lightcoral',
+                                hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                            ))
+
+                            # Middle bar top: Revenue from balancing (green, positive)
+                            fig_comparison.add_trace(go.Bar(
+                                name='Revenue from Balancing',
+                                x=['Boiler + Heat Pump'],
+                                y=[balancing_revenue_total],
+                                marker_color='green',
+                                hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                            ))
+
+                            # Right bar: Savings (light green, positive)
+                            fig_comparison.add_trace(go.Bar(
+                                name='Savings',
+                                x=['Savings'],
+                                y=[savings_total],
+                                marker_color='lightgreen',
+                                hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>'
+                            ))
+
+                            fig_comparison.update_layout(
+                                title=f"BOILER vs HEAT PUMP COST COMPARISON (Project Lifetime: {number_of_years} years)",
+                                barmode='relative',
+                                yaxis_title="Cost/Revenue (tūkst. EUR)",
+                                yaxis=dict(zeroline=True, zerolinecolor='black', zerolinewidth=2),
+                                showlegend=True
+                            )
+
+                            st.plotly_chart(fig_comparison, use_container_width=True)
+
+                            # Raw data expander
+                            with st.expander("Raw Comparison Data"):
+                                st.json(comparison)
+                        else:
+                            st.info("Comparison data not found in response.")
                 else:
                     try:
                         error_data = response.json()
