@@ -456,42 +456,54 @@ def render_p2g_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     st.info("Vandenilio prekybos duomenų nėra.")
 
                     with tab3:
-                        st.subheader("ECONOMIC RESULTS BY PRODUCT")
+                        st.subheader("ECONOMIC RESULTS")
 
                         if "aggregated" in data and "economic_results" in data["aggregated"]:
                             econ_data = data["aggregated"]["economic_results"]
 
-                            st.write("##### REVENUE BY PRODUCT")
-                            if "revenue_table" in econ_data and econ_data["revenue_table"]:
-                                st.table(econ_data["revenue_table"])
-                                fig_rev = px.bar(
-                                    econ_data["revenue_table"], x="Product", y="Value (tūkst. EUR)",
-                                    title="REVENUE BY PRODUCT"
-                                )
-                                fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                st.plotly_chart(fig_rev, use_container_width=True)
+                            # Row 1: Gross Revenue and Variable Costs side by side
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.write("##### GROSS REVENUE BY PRODUCT (SOH-adjusted)")
+                                if "gross_revenue_by_product" in econ_data and econ_data["gross_revenue_by_product"]:
+                                    st.table(econ_data["gross_revenue_by_product"])
+                                    fig_rev = px.bar(
+                                        econ_data["gross_revenue_by_product"], x="Product", y="Value (tūkst. EUR)",
+                                        title="GROSS REVENUE BY PRODUCT"
+                                    )
+                                    fig_rev.update_traces(marker_color='#2ecc71', hovertemplate='%{y:,.2f}<extra></extra>')
+                                    st.plotly_chart(fig_rev, use_container_width=True)
+                                else:
+                                    st.info("No revenue data available")
+
+                            with col2:
+                                st.write("##### VARIABLE COSTS BY PRODUCT (SOH-adjusted)")
+                                if "variable_costs_by_product" in econ_data and econ_data["variable_costs_by_product"]:
+                                    st.table(econ_data["variable_costs_by_product"])
+                                    fig_cost = px.bar(
+                                        econ_data["variable_costs_by_product"], x="Product", y="Value (tūkst. EUR)",
+                                        title="VARIABLE COSTS BY PRODUCT"
+                                    )
+                                    fig_cost.update_traces(marker_color='#e74c3c', hovertemplate='%{y:,.2f}<extra></extra>')
+                                    st.plotly_chart(fig_cost, use_container_width=True)
+                                else:
+                                    st.info("No cost data available")
+
+                            # Row 2: Fixed Costs
+                            st.write("##### FIXED COSTS")
+                            if "fixed_costs_table" in econ_data and econ_data["fixed_costs_table"]:
+                                st.table(econ_data["fixed_costs_table"])
                             else:
-                                st.info("No revenue data available")
+                                st.info("No fixed costs data available")
 
-                            st.write("##### COST BY PRODUCT")
-                            if "cost_table" in econ_data and econ_data["cost_table"]:
-                                st.table(econ_data["cost_table"])
-                                fig_cost = px.bar(
-                                    econ_data["cost_table"], x="Product", y="Value (tūkst. EUR)",
-                                    title="COST BY PRODUCT"
-                                )
-                                fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                st.plotly_chart(fig_cost, use_container_width=True)
-                            else:
-                                st.info("No cost data available")
-
-                            st.metric("TOTAL PROFIT", f"{econ_data.get('total_profit', 0):.2f} tūkst. EUR")
-
+                            # Row 3: Yearly Results
                             st.write("##### YEARLY RESULTS")
                             if "yearly_table" in econ_data and econ_data["yearly_table"]:
                                 yearly_df = pd.DataFrame(econ_data["yearly_table"])
                                 st.table(yearly_df)
 
+                                # NPV line chart
                                 if "YEAR" in yearly_df.columns and "NPV (tūkst. EUR)" in yearly_df.columns:
                                     fig_yearly_npv = px.line(
                                         yearly_df, x="YEAR", y="NPV (tūkst. EUR)", markers=True,
@@ -499,27 +511,19 @@ def render_p2g_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     )
                                     fig_yearly_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                     st.plotly_chart(fig_yearly_npv, use_container_width=True)
+                            else:
+                                st.info("No yearly results data available.")
 
-                                # Check for SOH (State of Health) visualization specific to P2G
-                                if "SOH (%)" in yearly_df.columns:
+                            # SOH visualization from separate soh_data
+                            if "soh_data" in econ_data and econ_data["soh_data"]:
+                                soh_df = pd.DataFrame(econ_data["soh_data"])
+                                if "YEAR" in soh_df.columns and "SOH (%)" in soh_df.columns:
                                     fig_soh = px.line(
-                                        yearly_df, x="YEAR", y="SOH (%)", markers=True,
+                                        soh_df, x="YEAR", y="SOH (%)", markers=True,
                                         title="ELECTROLYZER STATE OF HEALTH OVER TIME"
                                     )
                                     fig_soh.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                     st.plotly_chart(fig_soh, use_container_width=True)
-
-                                y_metrics = [col for col in
-                                             ["CAPEX (tūkst. EUR)", "OPEX (tūkst. EUR)", "CF (tūkst. EUR)"] if
-                                             col in yearly_df.columns]
-                                if "YEAR" in yearly_df.columns and y_metrics:
-                                    fig_yearly_metrics = px.bar(
-                                        yearly_df, x="YEAR", y=y_metrics,
-                                        title="YEARLY FINANCIAL METRICS", barmode="group"
-                                    )
-                                    st.plotly_chart(fig_yearly_metrics, use_container_width=True)
-                            else:
-                                st.info("No yearly results data available.")
                         else:
                             st.info("Economic results data not found.")
                 else:

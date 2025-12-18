@@ -336,18 +336,31 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     st.plotly_chart(fig_npv, use_container_width=True)
 
                             with col2:
-                                # REVENUE vs COST BY PRODUCTS CHART (without 'perkama DA')
+                                # REVENUE vs COST BY PRODUCTS CHART - PROJECT LIFETIME
                                 rev_cost_data = summary.get('revenue_cost_chart_data', {})
+                                profit_data = summary.get('profit_breakdown_chart_data', {})
+                                npv_data = summary.get('npv_chart_data', {})
+
                                 if rev_cost_data and 'products' in rev_cost_data and 'values' in rev_cost_data:
+                                    # Use annual values directly (consistent with BEKS and P2G)
+                                    products = list(rev_cost_data['products'])
+                                    values = list(rev_cost_data['values'])
+
+                                    # Add Sutaupymai (DA savings) - annual value
+                                    da_savings = profit_data.get('da_savings', 0)
+                                    if abs(da_savings) > 0.01:
+                                        products.append('Sutaupymai')
+                                        values.append(da_savings)
+
                                     fig_rev_cost = px.bar(
-                                        x=rev_cost_data['products'],
-                                        y=rev_cost_data['values'],
+                                        x=products,
+                                        y=values,
                                         labels={"x": "Product", "y": "Value (tūkst. EUR)"},
                                         title="REVENUE vs COST BY PRODUCTS"
                                     )
 
                                     # Color code based on positive/negative values
-                                    colors = ['red' if v < 0 else 'green' for v in rev_cost_data['values']]
+                                    colors = ['red' if v < 0 else 'green' for v in values]
                                     fig_rev_cost.update_traces(marker_color=colors,
                                                                hovertemplate='%{y:,.2f}<extra></extra>')
 
@@ -357,16 +370,26 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             col1, col2 = st.columns(2)
 
                             with col1:
-                                # Profit breakdown stacked chart
+                                # Profit breakdown stacked chart - PROJECT LIFETIME
                                 profit_data = summary.get('profit_breakdown_chart_data', {})
+                                npv_data = summary.get('npv_chart_data', {})
                                 if profit_data:
+                                    # Get number of years from backend response
+                                    number_of_years = len(npv_data.get('years', [])) - 1 if npv_data.get('years') else 1
+
+                                    # Multiply by years for project lifetime (CAPEX and OPEX already project totals)
+                                    da_savings_total = profit_data.get('da_savings', 0) * number_of_years
+                                    balancing_revenue_total = profit_data.get('balancing_revenue', 0) * number_of_years
+                                    capex = profit_data.get('capex', 0)
+                                    opex = profit_data.get('opex', 0)
+
                                     fig_profit = go.Figure()
 
                                     # Positive values (revenue/savings) - green - above zero line
                                     fig_profit.add_trace(go.Bar(
                                         name='DA Sutaupymai',
                                         x=profit_data['categories'],
-                                        y=[profit_data.get('da_savings', 0)],
+                                        y=[da_savings_total],
                                         marker_color='lightgreen',
                                         hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
                                         base=0
@@ -375,17 +398,17 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     fig_profit.add_trace(go.Bar(
                                         name='Pajamos iš balansavimo',
                                         x=profit_data['categories'],
-                                        y=[profit_data.get('balancing_revenue', 0)],
+                                        y=[balancing_revenue_total],
                                         marker_color='green',
                                         hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
-                                        base=[profit_data.get('da_savings', 0)]  # Stack on top of DA savings
+                                        base=[da_savings_total]  # Stack on top of DA savings
                                     ))
 
                                     # Negative values (costs) - red - below zero line
                                     fig_profit.add_trace(go.Bar(
                                         name='CAPEX',
                                         x=profit_data['categories'],
-                                        y=[-profit_data.get('capex', 0)],  # Negative values
+                                        y=[-capex],  # Negative values
                                         marker_color='lightcoral',
                                         hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
                                         base=0
@@ -394,10 +417,10 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     fig_profit.add_trace(go.Bar(
                                         name='OPEX',
                                         x=profit_data['categories'],
-                                        y=[-profit_data.get('opex', 0)],  # Negative values
+                                        y=[-opex],  # Negative values
                                         marker_color='red',
                                         hovertemplate='%{y:,.2f} tūkst. EUR<extra></extra>',
-                                        base=[-profit_data.get('capex', 0)]  # Stack below CAPEX
+                                        base=[-capex]  # Stack below CAPEX
                                     ))
 
                                     fig_profit.update_layout(
@@ -624,57 +647,65 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                         if 'aggregated' in data and 'economic_results' in data['aggregated']:
                             econ_data = data['aggregated']['economic_results']
 
-                            # Display revenue table and chart
-                            st.write("##### REVENUE BY PRODUCT")
-                            if 'revenue_table' in econ_data and econ_data['revenue_table']:
-                                st.table(econ_data['revenue_table'])
-
-                                # Create graph from table data
+                            # GROSS REVENUE BY PRODUCT (green bar chart)
+                            st.write("##### GROSS REVENUE BY PRODUCT")
+                            gross_revenue_data = econ_data.get('gross_revenue_by_product', [])
+                            if gross_revenue_data:
+                                st.table(gross_revenue_data)
                                 fig_rev = px.bar(
-                                    econ_data['revenue_table'],
+                                    gross_revenue_data,
                                     x="Product",
                                     y="Value (tūkst. EUR)",
-                                    title="REVENUE BY PRODUCT"
+                                    title="GROSS REVENUE BY PRODUCT",
+                                    color_discrete_sequence=['#2ecc71']  # Green
                                 )
                                 fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                 st.plotly_chart(fig_rev, use_container_width=True)
+                            else:
+                                st.info("No gross revenue data available")
 
-                            # Display costs table and chart
-                            st.write("##### COST BY PRODUCT")
-                            if 'cost_table' in econ_data and econ_data['cost_table']:
-                                st.table(econ_data['cost_table'])
-
-                                # Create graph from table data
-                                fig_cost = px.bar(
-                                    econ_data['cost_table'],
+                            # VARIABLE COSTS BY PRODUCT (red bar chart)
+                            st.write("##### VARIABLE COSTS BY PRODUCT")
+                            variable_costs_data = econ_data.get('variable_costs_by_product', [])
+                            if variable_costs_data:
+                                st.table(variable_costs_data)
+                                fig_var = px.bar(
+                                    variable_costs_data,
                                     x="Product",
                                     y="Value (tūkst. EUR)",
-                                    title="COST BY PRODUCT"
+                                    title="VARIABLE COSTS BY PRODUCT",
+                                    color_discrete_sequence=['#e74c3c']  # Red
                                 )
-                                fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                                st.plotly_chart(fig_cost, use_container_width=True)
+                                fig_var.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                                st.plotly_chart(fig_var, use_container_width=True)
+                            else:
+                                st.info("No variable costs data available")
 
-                            # Display total profit
-                            if 'total_profit' in econ_data:
-                                st.metric("TOTAL PROFIT", f"{econ_data['total_profit']:.2f} tūkst. EUR")
+                            # FIXED COSTS (table only)
+                            st.write("##### FIXED COSTS")
+                            fixed_costs_data = econ_data.get('fixed_costs_table', [])
+                            if fixed_costs_data:
+                                st.table(fixed_costs_data)
+                            else:
+                                st.info("No fixed costs data available")
 
-                            # Display yearly results table
+                            # YEARLY RESULTS (table + NPV line chart)
                             st.write("##### YEARLY RESULTS")
-                            if 'yearly_table' in econ_data:
-                                st.table(econ_data['yearly_table'])
+                            if "yearly_table" in econ_data and econ_data["yearly_table"]:
+                                st.table(econ_data["yearly_table"])
 
-                                # Plot yearly NPV
-                                yearly_df = pd.DataFrame(econ_data['yearly_table'])
-                                if 'YEAR' in yearly_df.columns and 'NPV (tūkst. EUR)' in yearly_df.columns:
+                                yearly_df = pd.DataFrame(econ_data["yearly_table"])
+                                if "YEAR" in yearly_df.columns and "NPV (tūkst. EUR)" in yearly_df.columns:
                                     fig_yearly_npv = px.line(
-                                        yearly_df,
-                                        x="YEAR",
-                                        y="NPV (tūkst. EUR)",
-                                        markers=True,
+                                        yearly_df, x="YEAR", y="NPV (tūkst. EUR)", markers=True,
                                         title="NET PRESENT VALUE OVER TIME"
                                     )
                                     fig_yearly_npv.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                                     st.plotly_chart(fig_yearly_npv, use_container_width=True)
+                            else:
+                                st.info("No yearly results data available.")
+                        else:
+                            st.info("Economic results data not available.")
 
                     with tab4:
                         # DSR-specific comparison section
@@ -686,41 +717,68 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
 
                             # Display updated comparison metrics
                             if isinstance(comparison, dict):
-                                cols = st.columns(3)
+                                # Get additional data
+                                summary = data['aggregated'].get('summary', {})
+                                profit_data = summary.get('profit_breakdown_chart_data', {})
+                                chart_data = comparison.get('comparison_chart_data', {})
+
+                                da_savings = profit_data.get('da_savings', 0)
+                                balancing_revenue = chart_data.get('balancing_revenue', 0)
+
+                                # Row 1: 3 metrics
+                                row1_cols = st.columns(3)
 
                                 # Baseline Cost (No DSR)
                                 if 'be DSR' in comparison:
                                     baseline_data = comparison['be DSR']
-                                    with cols[0]:
+                                    with row1_cols[0]:
                                         st.metric(
                                             baseline_data.get('label', 'Baseline Cost (No DSR)'),
                                             f"{baseline_data['value']:.2f} tūkst. EUR",
-                                            help="Cost of operation without DSR optimization (shown as negative to indicate cost)"
+                                            help="Cost of operation without DSR optimization"
                                         )
 
                                 # Optimized Cost (With DSR)
                                 if 'su DSR' in comparison and 'comparison_chart_data' in comparison:
                                     optimized_data = comparison['su DSR']
-                                    # Use the optimized cost from chart data (same as displayed in the chart)
-                                    optimized_cost = comparison['comparison_chart_data']['optimized_cost']
-                                    with cols[1]:
+                                    optimized_cost = chart_data['optimized_cost']
+                                    with row1_cols[1]:
                                         st.metric(
                                             optimized_data.get('label', 'Optimized Cost (With DSR)'),
                                             f"{optimized_cost:.2f} tūkst. EUR",
-                                            help="Cost of electricity consumption with DSR optimization (shown as negative to indicate cost)"
+                                            help="Cost with DSR optimization"
                                         )
 
-                                # Nauda iš DSR
+                                # DA Sutaupymai
+                                with row1_cols[2]:
+                                    st.metric(
+                                        "DA Sutaupymai",
+                                        f"{da_savings:.2f} tūkst. EUR",
+                                        help="Savings from DA market optimization"
+                                    )
+
+                                # Row 2: 2 metrics
+                                row2_cols = st.columns(2)
+
+                                # Pajamos iš balansavimo
+                                with row2_cols[0]:
+                                    st.metric(
+                                        "Pajamos iš balansavimo",
+                                        f"{balancing_revenue:.2f} tūkst. EUR",
+                                        help="Revenue from balancing market participation"
+                                    )
+
+                                # Nauda iš DSR (total benefit)
                                 if 'skirtumas' in comparison:
                                     benefit_data = comparison['skirtumas']
-                                    with cols[2]:
+                                    with row2_cols[1]:
                                         value = benefit_data['value']
                                         st.metric(
-                                            benefit_data.get('label', 'Nauda iš DSR'),
+                                            "Nauda iš DSR",
                                             f"{abs(value):.2f} tūkst. EUR",
                                             delta=f"{abs(value):.2f}",
                                             delta_color="normal" if value >= 0 else "inverse",
-                                            help="Total benefit from DSR implementation"
+                                            help="Total benefit: DA Savings + Balancing Revenue"
                                         )
 
                                 # Comparison chart

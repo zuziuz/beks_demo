@@ -129,7 +129,6 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                 if LOCAL_MODE:
                     headers["P2X-APIM-Secret"] = P2X_APIM_SECRET
 
-                # response = requests.post(f"{BE_URL}beks", json=request_body)
                 response = requests.post(f"{BE_URL}beks", data={"parameters": json.dumps(request_body)}, headers=headers)
 
                 # Check if the request was successful
@@ -886,48 +885,82 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     )
 
                     with tab3:
-                        st.subheader("ECONOMIC RESULTS BY PRODUCT")
+                        st.subheader("ECONOMIC RESULTS")
 
                         econ_data = data['aggregated']['economic_results']
 
-                        # Display revenues table and chart
-                        st.write("##### REVENUE BY PRODUCT")
-                        if econ_data['revenue_table']:  # Check if list is not empty
-                            st.table(econ_data['revenue_table'])
+                        # Display GROSS REVENUE BY PRODUCT table and chart
+                        st.write("##### GROSS REVENUE BY PRODUCT")
+                        gross_revenue_data = econ_data.get('gross_revenue_by_product', econ_data.get('revenue_table', []))
+                        if gross_revenue_data:
+                            st.table(gross_revenue_data)
 
                             # Create graph from table data
                             fig_rev = px.bar(
-                                econ_data['revenue_table'],
+                                gross_revenue_data,
                                 x="Product",
                                 y="Value (tūkst. EUR)",
-                                title="REVENUE BY PRODUCT"
+                                title="GROSS REVENUE BY PRODUCT",
+                                color_discrete_sequence=['#2ecc71']
                             )
 
                             fig_rev.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                             st.plotly_chart(fig_rev, use_container_width=True)
                         else:
-                            st.info("No revenue data available")
+                            st.info("No gross revenue data available")
 
-                        # Display costs table and chart
-                        st.write("##### COST BY PRODUCT")
-                        if econ_data['cost_table']:  # Check if list is not empty
-                            st.table(econ_data['cost_table'])
+                        # Display VARIABLE COSTS BY PRODUCT table and chart
+                        st.write("##### VARIABLE COSTS BY PRODUCT")
+                        variable_costs_data = econ_data.get('variable_costs_by_product', [])
+                        if variable_costs_data:
+                            st.table(variable_costs_data)
 
                             # Create graph from table data
-                            fig_cost = px.bar(
-                                econ_data['cost_table'],
+                            fig_var_cost = px.bar(
+                                variable_costs_data,
                                 x="Product",
                                 y="Value (tūkst. EUR)",
-                                title="COST BY PRODUCT"
+                                title="VARIABLE COSTS BY PRODUCT",
+                                color_discrete_sequence=['#e74c3c']
                             )
 
-                            fig_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
-                            st.plotly_chart(fig_cost, use_container_width=True)
+                            fig_var_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                            st.plotly_chart(fig_var_cost, use_container_width=True)
                         else:
-                            st.info("No cost data available")
+                            st.info("No variable costs data available")
+
+                        # Display OTHER COSTS BY PRODUCT table and chart (e.g., aFRRd/mFRRd when negative)
+                        other_costs_data = econ_data.get('other_costs_by_product', [])
+                        if other_costs_data:
+                            st.write("##### OTHER COSTS BY PRODUCT")
+                            st.table(other_costs_data)
+
+                            # Create graph from table data
+                            fig_other_cost = px.bar(
+                                other_costs_data,
+                                x="Product",
+                                y="Value (tūkst. EUR)",
+                                title="OTHER COSTS BY PRODUCT",
+                                color_discrete_sequence=['#f39c12']  # Orange color
+                            )
+
+                            fig_other_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
+                            st.plotly_chart(fig_other_cost, use_container_width=True)
+
+                        # Display FIXED COSTS table
+                        st.write("##### FIXED COSTS")
+                        fixed_costs_data = econ_data.get('fixed_costs_table', [])
+                        if fixed_costs_data:
+                            st.table(fixed_costs_data)
+                        else:
+                            # Fallback to old cost_table if fixed_costs_table not available
+                            if econ_data.get('cost_table'):
+                                st.table(econ_data['cost_table'])
+                            else:
+                                st.info("No fixed costs data available")
 
                         # Display total profit
-                        st.metric("TOTAL PROFIT", f"{econ_data['total_profit']:.2f} tūkst. EUR")
+                        st.metric("TOTAL ANNUAL PROFIT (before SOH)", f"{econ_data['total_profit']:.2f} tūkst. EUR")
 
                         # Display yearly results table
                         st.write("##### YEARLY RESULTS")
