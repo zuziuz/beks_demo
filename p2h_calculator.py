@@ -285,7 +285,7 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                     capex = yearly[0].get('CAPEX (tūkst. EUR)', 0) if yearly else 0
                                     opex_annual = yearly[1].get('OPEX (tūkst. EUR)', 0) if len(yearly) > 1 else 0
                                     opex_total = opex_annual * number_of_years
-                                    savings_total = abs(comparison.get('skirtumas', 0)) * number_of_years
+                                    savings_total = comparison['skirtumas']['total']
 
                                     # Calculate balancing revenue (only balancing market products)
                                     balancing_revenue = 0
@@ -375,7 +375,7 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                             values.append(val)
 
                                     # Sutaupymai (Savings) - PROJECT LIFETIME
-                                    sutaupymai_val = -comparison.get('skirtumas', 0) * number_of_years
+                                    sutaupymai_val = -comparison['skirtumas']['total']
                                     if abs(sutaupymai_val) > 0.001:
                                         products.append('Sutaupymai')
                                         values.append(sutaupymai_val)
@@ -642,14 +642,6 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             else:
                                 st.info("No variable costs data available")
 
-                            # FIXED COSTS - table only
-                            st.write("##### FIXED COSTS")
-                            fixed_costs_data = econ_data.get('fixed_costs_table', [])
-                            if fixed_costs_data:
-                                st.table(fixed_costs_data)
-                            else:
-                                st.info("No fixed costs data available")
-
                             # YEARLY RESULTS - table + NPV line chart
                             st.write("##### YEARLY RESULTS")
                             if "yearly_table" in econ_data and econ_data["yearly_table"]:
@@ -677,33 +669,14 @@ def render_p2h_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             st.write("### P2H SAVINGS COMPARISON (Project Lifetime)")
                             st.write("Total comparison between boiler-only operation and optimized heat pump operation over project lifetime")
 
-                            # Get number of years from yearly data
-                            number_of_years = 1
-                            if 'yearly' in data['aggregated'] and len(data['aggregated']['yearly']) > 1:
-                                number_of_years = len(data['aggregated']['yearly']) - 1  # Subtract year 0 (CAPEX only)
-
-                            # Calculate balancing revenue from economic results (annual)
-                            balancing_revenue_annual = 0.0
-                            if 'aggregated' in data and 'economic_results' in data['aggregated']:
-                                econ_results = data['aggregated']['economic_results']
-                                if 'gross_revenue_by_product' in econ_results:
-                                    for row in econ_results['gross_revenue_by_product']:
-                                        product = row.get('Product', '')
-                                        # Sum all balancing market revenues (CAP and energy)
-                                        if any(x in product for x in ['aFRRu', 'aFRRd', 'mFRRu', 'mFRRd', 'FCR']):
-                                            balancing_revenue_annual += row.get('Value (tūkst. EUR)', 0)
-
-                            # Get annual comparison values
-                            cost_boiler_annual = comparison.get('tik katilas', 0)
-                            cost_with_hp_annual = comparison.get('katilas + šilumos siurblys', 0)
-                            savings_annual = abs(comparison.get('skirtumas', 0))
-
-                            # Calculate project lifetime totals
-                            cost_boiler_total = cost_boiler_annual * number_of_years
-                            cost_with_hp_total = cost_with_hp_annual * number_of_years
-                            savings_total = savings_annual * number_of_years
-                            balancing_revenue_total = balancing_revenue_annual * number_of_years
-                            benefits_total = savings_total + balancing_revenue_total
+                            # Get pre-calculated values from backend
+                            number_of_years = comparison.get('number_of_years', 1)
+                            cost_boiler_total = comparison['tik katilas']['total']
+                            cost_with_hp_total = comparison['katilas + šilumos siurblys']['total']
+                            savings_total = comparison['skirtumas']['total']
+                            balancing_revenue_total = comparison['balancing_revenue']['total']
+                            benefits_total = comparison['benefits']['total']
+                            chart_data = comparison.get('comparison_chart_data', {})
 
                             # 5 KPI metrics in two rows for better readability
                             # Row 1: 3 metrics
