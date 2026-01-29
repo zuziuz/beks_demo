@@ -681,14 +681,6 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             else:
                                 st.info("No variable costs data available")
 
-                            # FIXED COSTS (table only)
-                            st.write("##### FIXED COSTS")
-                            fixed_costs_data = econ_data.get('fixed_costs_table', [])
-                            if fixed_costs_data:
-                                st.table(fixed_costs_data)
-                            else:
-                                st.info("No fixed costs data available")
-
                             # YEARLY RESULTS (table + NPV line chart)
                             st.write("##### YEARLY RESULTS")
                             if "yearly_table" in econ_data and econ_data["yearly_table"]:
