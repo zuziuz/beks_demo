@@ -490,14 +490,7 @@ def render_p2g_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                                 else:
                                     st.info("No cost data available")
 
-                            # Row 2: Fixed Costs
-                            st.write("##### FIXED COSTS")
-                            if "fixed_costs_table" in econ_data and econ_data["fixed_costs_table"]:
-                                st.table(econ_data["fixed_costs_table"])
-                            else:
-                                st.info("No fixed costs data available")
-
-                            # Row 3: Yearly Results
+                            # Row 2: Yearly Results
                             st.write("##### YEARLY RESULTS")
                             if "yearly_table" in econ_data and econ_data["yearly_table"]:
                                 yearly_df = pd.DataFrame(econ_data["yearly_table"])
