@@ -947,18 +947,6 @@ def render_beks_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                             fig_other_cost.update_traces(hovertemplate='%{y:,.2f}<extra></extra>')
                             st.plotly_chart(fig_other_cost, use_container_width=True)
 
-                        # Display FIXED COSTS table
-                        st.write("##### FIXED COSTS")
-                        fixed_costs_data = econ_data.get('fixed_costs_table', [])
-                        if fixed_costs_data:
-                            st.table(fixed_costs_data)
-                        else:
-                            # Fallback to old cost_table if fixed_costs_table not available
-                            if econ_data.get('cost_table'):
-                                st.table(econ_data['cost_table'])
-                            else:
-                                st.info("No fixed costs data available")
-
                         # Display total profit
                         st.metric("TOTAL ANNUAL PROFIT (before SOH)", f"{econ_data['total_profit']:.2f} tūkst. EUR")
 
