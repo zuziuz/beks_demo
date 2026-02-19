@@ -45,7 +45,7 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
             q_max = st.number_input("Q_max - Maximum power (MW)", min_value=0.0, value=15.0, step=0.1,
                                     key="dsr_q_max")
 
-            # Reaction time slider with fixed values (same as BEKS)
+            # Reaction time sliders with fixed values
             reaction_time_labels = {
                 30: "<=30s",
                 300: "<=300s",
@@ -53,12 +53,21 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
                 1000: ">750s"
             }
 
-            reaction_time = st.select_slider(
-                "reaction_time (s)",
+            # Always show both sliders
+            reaction_time_u = st.select_slider(
+                "reaction_time_u (s) - Upward Regulation Time",
                 options=[30, 300, 750, 1000],
                 value=300,
                 format_func=lambda x: reaction_time_labels[x],
-                key="dsr_reaction_time"
+                key="dsr_reaction_time_u"
+            )
+
+            reaction_time_d = st.select_slider(
+                "reaction_time_d (s) - Downward Regulation Time",
+                options=[30, 300, 750, 1000],
+                value=300,
+                format_func=lambda x: reaction_time_labels[x],
+                key="dsr_reaction_time_d"
             )
 
             t_shift = st.number_input("T_shift - Time shift for restoration (quarters)", min_value=1, value=1, step=1,
@@ -187,12 +196,18 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
         submit_button = st.form_submit_button("Submit")
 
     if submit_button:
-        # Determine produktai based on regulation direction (no FCR for DSR)
+        # Adjust reaction time and determine produktai based on regulation direction (no FCR for DSR)
         if regulation_direction == "Aukštyn":
+            adjusted_reaction_time_u = reaction_time_u
+            adjusted_reaction_time_d = 0
             produktai = {"aFRRu": True, "aFRRd": False, "mFRRu": True, "mFRRd": False}
         elif regulation_direction == "Žemyn":
+            adjusted_reaction_time_u = 0
+            adjusted_reaction_time_d = reaction_time_d
             produktai = {"aFRRu": False, "aFRRd": True, "mFRRu": False, "mFRRd": True}
         else:  # "Į abi puses"
+            adjusted_reaction_time_u = reaction_time_u
+            adjusted_reaction_time_d = reaction_time_d
             produktai = {"aFRRu": True, "aFRRd": True, "mFRRu": True, "mFRRd": True}
 
         # Create the request body
@@ -200,7 +215,8 @@ def render_dsr_calculator(BE_URL, LOCAL_MODE, P2X_APIM_SECRET):
             "Q_avg": q_avg,
             "Q_min": q_min,
             "Q_max": q_max,
-            "reaction_time": reaction_time,
+            "reaction_time_d": adjusted_reaction_time_d,
+            "reaction_time_u": adjusted_reaction_time_u,
             "T_shift": t_shift,
             "CAPEX": capex,
             "OPEX": opex,
